@@ -33,19 +33,19 @@ const ISO_BY_PREVIEW: Record<PreviewMapId, string[] | null> = {
 };
 
 const GRID_CELLS: Record<PreviewMapId, number> = {
-  world: 64,
-  kr: 44,
-  jp: 40,
-  cn: 38,
-  us: 38,
+  world: 58,
+  kr: 20,
+  jp: 24,
+  cn: 34,
+  us: 34,
 };
 
 export const PREVIEW_DOT_RADIUS: Record<PreviewMapId, number> = {
-  world: 1.2,
-  kr: 1.55,
-  jp: 1.5,
-  cn: 1.4,
-  us: 1.4,
+  world: 1.15,
+  kr: 1.35,
+  jp: 1.3,
+  cn: 1.25,
+  us: 1.25,
 };
 
 const FIT_MAX_ZOOM: Record<PreviewMapId, number> = {

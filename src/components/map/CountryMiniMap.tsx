@@ -34,7 +34,7 @@ function ensurePreviewDots(map: MapboxMap, id: PreviewMapId): boolean {
         "circle-radius": PREVIEW_DOT_RADIUS[id],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
-        "circle-opacity": 0.72,
+        "circle-opacity": 0.78,
       },
     });
   }
