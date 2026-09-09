@@ -1,4 +1,9 @@
 import { COUNTRY_BY_ID } from "@/data/country-masks";
+import {
+  isInKoreaTerritory,
+  KOREA_GRID_BOUNDS,
+  KOREA_ISLAND_SEEDS,
+} from "@/data/korea-territory";
 import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
 import type { CountryId, Photo } from "@/types/album";
@@ -6,13 +11,11 @@ import type { Feature, FeatureCollection, Point } from "geojson";
 import type { Map as MapboxMap } from "mapbox-gl";
 
 /**
- * 국가 bounding box 안의 위경도 격자. 줌/팬마다 다시 만들지 않습니다.
- * 해안선은 Mapbox streets 수역 폴리곤의 반대로 남깁니다.
- *
- * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — GRID_CELLS, 기본 opacity
+ * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
+ * 줌/팬마다 다시 만들지 않습니다.
  */
 export const DOT_RADIUS_PX = 1.85;
-const GRID_CELLS = 110;
+const GRID_CELLS = 130;
 
 export type LandDotProps = { count: number };
 
@@ -21,7 +24,7 @@ export function buildLandDotGrid(
   photos: Photo[],
   countryId: CountryId,
 ): FeatureCollection<Point, LandDotProps> {
-  const bounds = COUNTRY_BY_ID[countryId].bounds;
+  const bounds = countryId === "kr" ? KOREA_GRID_BOUNDS : COUNTRY_BY_ID[countryId].bounds;
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = bounds.maxLng - bounds.minLng;
   const step = Math.max(latSpan, lngSpan) / GRID_CELLS;
@@ -34,24 +37,47 @@ export function buildLandDotGrid(
 
   for (let lat = bounds.minLat + step / 2; lat < bounds.maxLat; lat += step) {
     for (let lng = bounds.minLng + step / 2; lng < bounds.maxLng; lng += step) {
+      if (countryId === "kr" && !isInKoreaTerritory(lng, lat)) continue;
       if (isInWater(lng, lat, water)) continue;
 
-      let count = 0;
-      for (const photo of photos) {
-        if (approxDistance({ lat, lng }, photo) <= influence) count += 1;
-      }
+      features.push(makeDot(index, lng, lat, photos, influence));
+      index += 1;
+    }
+  }
 
-      features.push({
-        type: "Feature",
-        id: index,
-        properties: { count },
-        geometry: { type: "Point", coordinates: [lng, lat] },
-      });
+  if (countryId === "kr") {
+    for (const seed of KOREA_ISLAND_SEEDS) {
+      const already = features.some(
+        (feature) =>
+          Math.abs(feature.geometry.coordinates[0]! - seed.lng) < step * 0.6 &&
+          Math.abs(feature.geometry.coordinates[1]! - seed.lat) < step * 0.6,
+      );
+      if (already) continue;
+      features.push(makeDot(index, seed.lng, seed.lat, photos, influence));
       index += 1;
     }
   }
 
   return { type: "FeatureCollection", features };
+}
+
+function makeDot(
+  id: number,
+  lng: number,
+  lat: number,
+  photos: Photo[],
+  influence: number,
+): Feature<Point, LandDotProps> {
+  let count = 0;
+  for (const photo of photos) {
+    if (approxDistance({ lat, lng }, photo) <= influence) count += 1;
+  }
+  return {
+    type: "Feature",
+    id,
+    properties: { count },
+    geometry: { type: "Point", coordinates: [lng, lat] },
+  };
 }
 
 function queryWaterPolygons(map: MapboxMap): GeoJSON.Feature[] {
