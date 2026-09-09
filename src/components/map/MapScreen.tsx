@@ -42,11 +42,11 @@ export function MapScreen() {
         <ColorPinFilter />
       </div>
 
-      <div className="absolute inset-x-0 bottom-24 z-20">
+      <div className="absolute inset-x-0 bottom-[4.35rem] z-20">
         <TimePicker />
       </div>
 
-      <p className="pointer-events-none absolute bottom-52 left-0 right-0 text-center text-[11px] text-neutral-500">
+      <p className="pointer-events-none absolute bottom-[9.15rem] left-0 right-0 text-center text-[11px] text-neutral-500">
         휠·트랙패드·핀치로 연속 줌 ·{" "}
         {overlayMode === "dots"
           ? "점의 진하기 = 사진 밀도 · 줌 9.5에서 흰 지도로"

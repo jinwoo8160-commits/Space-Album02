@@ -5,9 +5,10 @@ import { useMap } from "@/context/map-context";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef } from "react";
 
-const ITEM_H = 36;
+const ITEM_H = 26;
 /** 뷰포트가 칸 3개 높이이므로, 첫 값이 가운데 오려면 위아래 빈 칸이 1개면 됩니다. */
 const PAD = 1;
+const VIEWPORT_H = ITEM_H * 3;
 const ALL = "ALL";
 const MONTHS: (number | typeof ALL)[] = [ALL, ...Array.from({ length: 12 }, (_, i) => i + 1)];
 
@@ -46,14 +47,17 @@ export function TimePicker() {
 
   return (
     <div className="pointer-events-auto relative mx-auto w-[min(320px,86%)]">
-      <div className="pointer-events-none absolute inset-x-3 top-1/2 z-10 h-9 -translate-y-1/2 rounded-full bg-neutral-200/70" />
       <div
-        className="relative grid grid-cols-3 overflow-hidden py-1"
+        className="pointer-events-none absolute inset-x-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-neutral-200/70"
+        style={{ height: ITEM_H }}
+      />
+      <div
+        className="relative grid grid-cols-3 overflow-hidden"
         style={{
           maskImage:
-            "linear-gradient(to bottom, transparent, black 22%, black 78%, transparent)",
+            "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
           WebkitMaskImage:
-            "linear-gradient(to bottom, transparent, black 22%, black 78%, transparent)",
+            "linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)",
         }}
       >
         <WheelColumn
@@ -115,10 +119,11 @@ function WheelColumn({
         const next = values[index];
         if (next !== undefined && next !== value) onChange(next);
       }}
-      className="h-[108px] snap-y snap-mandatory overflow-y-scroll text-center [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="snap-y snap-mandatory overflow-y-scroll overscroll-contain text-center [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ height: VIEWPORT_H }}
     >
       {Array.from({ length: PAD }).map((_, i) => (
-        <div key={`pad-top-${i}`} className="h-9 snap-center" />
+        <div key={`pad-top-${i}`} className="snap-center" style={{ height: ITEM_H }} />
       ))}
       {values.map((item) => {
         const selected = item === value;
@@ -126,17 +131,18 @@ function WheelColumn({
           <div
             key={String(item)}
             className={cn(
-              "flex h-9 snap-center items-center justify-center gap-1 text-[15px] font-medium",
+              "flex snap-center items-center justify-center gap-0.5 text-[13px] font-medium leading-none",
               selected ? "text-neutral-900" : "text-neutral-400",
             )}
+            style={{ height: ITEM_H }}
           >
             <span>{item === ALL ? "—" : item}</span>
-            {selected ? <span className="text-[11px] font-normal text-neutral-500">{suffix}</span> : null}
+            {selected ? <span className="text-[10px] font-normal text-neutral-500">{suffix}</span> : null}
           </div>
         );
       })}
       {Array.from({ length: PAD }).map((_, i) => (
-        <div key={`pad-bot-${i}`} className="h-9 snap-center" />
+        <div key={`pad-bot-${i}`} className="snap-center" style={{ height: ITEM_H }} />
       ))}
     </div>
   );
