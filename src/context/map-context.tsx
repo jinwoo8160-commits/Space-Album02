@@ -9,8 +9,8 @@
  *        → (줌 6~11) 묶음 핀
  *        → (줌 12+) 개별 핀
  *
- * 줌은 우리 state 가 아니라 MapLibre 지도 인스턴스의 실제 zoom 입니다.
- * +/- 버튼도 map.zoomIn() 을 호출해, 레이어 전환 기준(0~5 / 6~11 / 12+)과 어긋나지 않게 합니다.
+ * 줌은 Mapbox GL 인스턴스의 실제 zoom 입니다.
+ * 휠/핀치가 연속으로 바꾸고, 레이어는 그 숫자에 맞춰 페이드됩니다.
  */
 
 import { COUNTRY_BY_ID, COUNTRIES } from "@/data/country-masks";
@@ -37,7 +37,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import type { MapRef } from "react-map-gl/maplibre";
+import type { MapRef } from "react-map-gl/mapbox";
 
 export const COUNTRY_DOTS = Object.fromEntries(
   COUNTRIES.map((country) => [country.id, maskToDots(country)]),
@@ -52,8 +52,6 @@ type MapContextValue = {
   mapZoom: number;
   setMapZoom: (zoom: number) => void;
   overlayMode: OverlayMode;
-  zoomIn: () => void;
-  zoomOut: () => void;
   flyToClusters: (lat: number, lng: number) => void;
   flyToPins: (lat: number, lng: number) => void;
   selectedCategories: Set<CategoryFilterKey>;
@@ -114,15 +112,6 @@ export function MapProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const zoomIn = useCallback(() => {
-    mapRef.current?.zoomIn({ duration: 280 });
-  }, []);
-
-  const zoomOut = useCallback(() => {
-    setSelectedPhotoId(null);
-    mapRef.current?.zoomOut({ duration: 280 });
-  }, []);
-
   const flyToClusters = useCallback((lat: number, lng: number) => {
     mapRef.current?.easeTo({
       center: [lng, lat],
@@ -172,8 +161,6 @@ export function MapProvider({ children }: { children: ReactNode }) {
     mapZoom,
     setMapZoom,
     overlayMode,
-    zoomIn,
-    zoomOut,
     flyToClusters,
     flyToPins,
     selectedCategories,

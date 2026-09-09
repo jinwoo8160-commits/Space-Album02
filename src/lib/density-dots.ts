@@ -13,7 +13,7 @@ import type { Feature, FeatureCollection, Point } from "geojson";
  * TODO: [디자인] 첨부 이미지 스타일 반영 위치
  * CELL_DEG / 원 반지름은 AlbumMap 의 Circle Layer paint 와 함께 조절하세요.
  */
-const CELL_DEG = 0.12;
+const CELL_DEG = 0.055;
 
 export type DensityProperties = {
   id: string;

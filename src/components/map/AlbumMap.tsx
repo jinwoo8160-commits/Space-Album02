@@ -6,45 +6,51 @@ import { COUNTRY_BY_ID } from "@/data/country-masks";
 import { useMap } from "@/context/map-context";
 import { clusterPhotos } from "@/lib/clustering";
 import { countryBounds, photosToDensityGeoJSON } from "@/lib/density-dots";
-import { loadMinimalGrayStyle } from "@/lib/map-style";
-import { DEFAULT_MAP_ZOOM, DOT_MAX_ZOOM } from "@/lib/zoom";
-import type { CircleLayerSpecification, StyleSpecification } from "maplibre-gl";
-import { useEffect, useMemo, useState } from "react";
-import Map, { Layer, Marker, Source } from "react-map-gl/maplibre";
-import "maplibre-gl/dist/maplibre-gl.css";
+import { MAPBOX_STYLE, MAPBOX_TOKEN } from "@/lib/map-style";
+import {
+  clusterLayerOpacity,
+  DEFAULT_MAP_ZOOM,
+  DOT_FADE_END,
+  DOT_FADE_START,
+  pinLayerOpacity,
+} from "@/lib/zoom";
+import type { CircleLayerSpecification } from "mapbox-gl";
+import { useMemo } from "react";
+import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 /**
- * 실제 지도(해안선·지형) 위에 줌 구간별 레이어를 올립니다.
+ * 공식 Mapbox GL JS 지도.
  *
- * Circle Layer 를 HTML 점이 아니라 지도 엔진에 넣는 이유:
- * 엔진이 GPU 로 그리므로 2~4px 점도 선명하고, 줌과 함께 부드럽게 움직입니다.
- * maxzoom: 6 이면 줌 6부터 이 레이어는 자동으로 사라집니다. (요구사항 0~5)
+ * 토큰: process.env.NEXT_PUBLIC_MAPBOX_TOKEN (.env.local)
+ * 줌: Mapbox 기본 scrollZoom / touchZoomRotate — 휠·트랙패드·핀치가 연속 줌입니다.
  *
- * TODO: [디자인] 첨부 이미지 스타일 반영 위치
- * 점 크기 = circle-radius, 진하기 = circle-opacity, 지도 회색조 = MAP_STYLE
+ * 도트 Circle Layer 의 opacity 는
+ *  1) 사진 밀도(count)
+ *  2) 줌 5.2→6.4 디졸브
+ * 를 곱한 것처럼 zoom interpolate 로 한 번에 표현합니다.
+ *
+ * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — MAPBOX_STYLE, circle-radius
  */
 const DOT_LAYER: Omit<CircleLayerSpecification, "source"> = {
   id: "photo-dots",
   type: "circle",
-  maxzoom: DOT_MAX_ZOOM,
+  maxzoom: DOT_FADE_END + 0.15,
   paint: {
-    // 반지름은 px 고정. 줌이 올라도 커져서 해안선을 가리지 않습니다.
-    "circle-radius": 2.4,
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 2.0, 5, 3.2],
     "circle-blur": 0,
-    "circle-color": "#111111",
-    // 밀도는 크기 대신 진하기(opacity)로만 표현합니다.
+    // Dark 스타일 위에서는 밝은 점이 보여야 합니다.
+    "circle-color": "#f2f2f2",
     "circle-opacity": [
       "interpolate",
       ["linear"],
-      ["get", "count"],
-      1,
-      0.35,
-      2,
-      0.55,
-      4,
-      0.78,
-      8,
-      0.95,
+      ["zoom"],
+      0,
+      ["interpolate", ["linear"], ["get", "count"], 1, 0.32, 2, 0.5, 4, 0.72, 8, 0.92],
+      DOT_FADE_START,
+      ["interpolate", ["linear"], ["get", "count"], 1, 0.32, 2, 0.5, 4, 0.72, 8, 0.92],
+      DOT_FADE_END,
+      0,
     ],
     "circle-stroke-width": 0,
     "circle-pitch-alignment": "viewport",
@@ -55,7 +61,6 @@ const DOT_LAYER: Omit<CircleLayerSpecification, "source"> = {
 export function AlbumMap() {
   const {
     filteredPhotos,
-    overlayMode,
     mapZoom,
     mapRef,
     setMapZoom,
@@ -65,29 +70,26 @@ export function AlbumMap() {
     selectedCountryId,
   } = useMap();
 
-  const [style, setStyle] = useState<StyleSpecification | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadMinimalGrayStyle().then((next) => {
-      if (!cancelled) setStyle(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const country = COUNTRY_BY_ID[selectedCountryId];
-
   const density = useMemo(() => photosToDensityGeoJSON(filteredPhotos), [filteredPhotos]);
-  const clusters = useMemo(
-    () => clusterPhotos(filteredPhotos, overlayMode, mapZoom),
-    [filteredPhotos, overlayMode, mapZoom],
+
+  const clusterOpacity = clusterLayerOpacity(mapZoom);
+  const pinOpacity = pinLayerOpacity(mapZoom);
+
+  const cityClusters = useMemo(
+    () =>
+      clusterOpacity > 0.02 ? clusterPhotos(filteredPhotos, "clusters", mapZoom) : [],
+    [filteredPhotos, mapZoom, clusterOpacity],
+  );
+  const pinClusters = useMemo(
+    () => (pinOpacity > 0.02 ? clusterPhotos(filteredPhotos, "pins", mapZoom) : []),
+    [filteredPhotos, mapZoom, pinOpacity],
   );
 
-  if (!style) {
+  if (!MAPBOX_TOKEN) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#f3f3f1] text-sm text-neutral-400">
-        지도를 불러오는 중…
+      <div className="flex h-full w-full items-center justify-center bg-[#111] px-6 text-center text-sm text-neutral-400">
+        `.env.local`에 NEXT_PUBLIC_MAPBOX_TOKEN 을 넣고 개발 서버를 다시 시작해 주세요.
       </div>
     );
   }
@@ -95,7 +97,8 @@ export function AlbumMap() {
   return (
     <Map
       ref={mapRef}
-      mapStyle={style}
+      mapboxAccessToken={MAPBOX_TOKEN}
+      mapStyle={MAPBOX_STYLE}
       initialViewState={{
         longitude: (country.bounds.minLng + country.bounds.maxLng) / 2,
         latitude: (country.bounds.minLat + country.bounds.maxLat) / 2,
@@ -103,7 +106,11 @@ export function AlbumMap() {
       }}
       minZoom={1.2}
       maxZoom={16}
-      attributionControl={{ compact: true }}
+      scrollZoom
+      touchZoomRotate
+      dragPan
+      doubleClickZoom
+      attributionControl
       interactiveLayerIds={["photo-dots"]}
       onLoad={(event) => {
         setMapZoom(event.target.getZoom());
@@ -137,34 +144,59 @@ export function AlbumMap() {
         <Layer {...DOT_LAYER} />
       </Source>
 
-      {overlayMode !== "dots"
-        ? clusters.map((cluster) => (
-            <Marker
-              key={cluster.id}
-              longitude={cluster.lng}
-              latitude={cluster.lat}
-              anchor="center"
-              pitchAlignment="viewport"
-              rotationAlignment="viewport"
-              style={{ pointerEvents: "auto" }}
-            >
-              {overlayMode === "pins" && cluster.photos.length === 1 ? (
-                <PhotoPin
-                  photo={cluster.photos[0]!}
-                  onClick={() => openPhoto(cluster.photos[0]!.id)}
-                />
-              ) : (
-                <PhotoClusterMarker
-                  cluster={cluster}
-                  onClick={() => {
-                    if (overlayMode === "clusters") flyToPins(cluster.lat, cluster.lng);
-                    else openPhoto(cluster.photos[0]!.id);
-                  }}
-                />
-              )}
-            </Marker>
-          ))
-        : null}
+      {cityClusters.map((cluster) => (
+        <Marker
+          key={`c-${cluster.id}`}
+          longitude={cluster.lng}
+          latitude={cluster.lat}
+          anchor="center"
+          pitchAlignment="viewport"
+          rotationAlignment="viewport"
+          style={{ pointerEvents: clusterOpacity > 0.35 ? "auto" : "none" }}
+        >
+          <div
+            style={{
+              opacity: clusterOpacity,
+              transform: `scale(${0.86 + clusterOpacity * 0.14})`,
+              transition: "opacity 80ms linear, transform 80ms linear",
+            }}
+          >
+            <PhotoClusterMarker
+              cluster={cluster}
+              onClick={() => flyToPins(cluster.lat, cluster.lng)}
+            />
+          </div>
+        </Marker>
+      ))}
+
+      {pinClusters.map((cluster) => (
+        <Marker
+          key={`p-${cluster.id}`}
+          longitude={cluster.lng}
+          latitude={cluster.lat}
+          anchor="center"
+          pitchAlignment="viewport"
+          rotationAlignment="viewport"
+          style={{ pointerEvents: pinOpacity > 0.4 ? "auto" : "none" }}
+        >
+          <div
+            style={{
+              opacity: pinOpacity,
+              transform: `scale(${0.9 + pinOpacity * 0.1})`,
+              transition: "opacity 80ms linear, transform 80ms linear",
+            }}
+          >
+            {cluster.photos.length === 1 ? (
+              <PhotoPin photo={cluster.photos[0]!} onClick={() => openPhoto(cluster.photos[0]!.id)} />
+            ) : (
+              <PhotoClusterMarker
+                cluster={cluster}
+                onClick={() => openPhoto(cluster.photos[0]!.id)}
+              />
+            )}
+          </div>
+        </Marker>
+      ))}
     </Map>
   );
 }
