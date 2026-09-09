@@ -38,7 +38,7 @@ export function ZoomControls() {
         type="button"
         aria-label="축소"
         disabled={atMin}
-        className="flex size-10 items-center justify-center text-neutral-800 hover:bg-neutral-50 disabled:pointer-events-none disabled:opacity-35"
+        className="flex size-10 items-center justify-center text-neutral-800 hover:bg-neutral-50 disabled:pointer-events-none disabled:text-neutral-300 disabled:opacity-30"
         onClick={() => zoomBy("out")}
       >
         <Minus className="size-4" strokeWidth={2.4} />
