@@ -20,12 +20,11 @@ export type CategoryFilterKey = "pink" | "green" | "cyan" | "red" | "unclassifie
  * 줌에 따라 올라가는 레이어 종류.
  * 숫자는 지도 엔진 줌이고, 이 이름은 "지금 무엇을 그릴지"입니다.
  *
- * 0~7     dots      배경 도트 격자
- * 7~9.5   dataDots  사진 좌표 Circle
- * 9.5~12  clusters  위성 + 묶음 핀
- * 12+     pins      위성 + 개별 핀
+ * 0~9.5   dots      배경 도트 격자
+ * 9.5~12  clusters  흰 모노톤 지도 + 묶음 핀
+ * 12+     pins      흰 모노톤 지도 + 개별 핀
  */
-export type OverlayMode = "dots" | "dataDots" | "clusters" | "pins";
+export type OverlayMode = "dots" | "clusters" | "pins";
 
 /** @deprecated OverlayMode 를 쓰세요. 예전 4단계 이름과의 호환용 별칭 */
 export type ZoomLevel = OverlayMode;

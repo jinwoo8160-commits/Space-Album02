@@ -1,52 +1,44 @@
+import { COUNTRY_BY_ID } from "@/data/country-masks";
+import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
-import type { Photo } from "@/types/album";
+import type { CountryId, Photo } from "@/types/album";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { Map as MapboxMap } from "mapbox-gl";
 
 /**
- * 화면 격자를 한 번만 만들고, 수역 폴리곤은 뷰포트에서 한 번만 가져옵니다.
- * (픽셀마다 queryRenderedFeatures 를 부르면 줌 중 WebGL 컨텍스트가 죽습니다.)
+ * 국가 bounding box 안의 위경도 격자. 줌/팬마다 다시 만들지 않습니다.
+ * 해안선은 Mapbox streets 수역 폴리곤의 반대로 남깁니다.
  *
- * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — SPACING_PX, 기본 회색
+ * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — GRID_CELLS, 기본 opacity
  */
-export const DOT_SPACING_PX = 7;
 export const DOT_RADIUS_PX = 1.85;
-export const PHOTO_INFLUENCE_PX = 44;
+const GRID_CELLS = 110;
 
 export type LandDotProps = { count: number };
 
 export function buildLandDotGrid(
   map: MapboxMap,
   photos: Photo[],
+  countryId: CountryId,
 ): FeatureCollection<Point, LandDotProps> {
-  const canvas = map.getCanvas();
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
+  const bounds = COUNTRY_BY_ID[countryId].bounds;
+  const latSpan = bounds.maxLat - bounds.minLat;
+  const lngSpan = bounds.maxLng - bounds.minLng;
+  const step = Math.max(latSpan, lngSpan) / GRID_CELLS;
+  const influence = step * 6.5;
 
-  const water = queryWaterPolygons(map, width, height);
-
-  const photoScreens = photos.map((photo) => {
-    const point = map.project([photo.lng, photo.lat]);
-    return { x: point.x, y: point.y };
-  });
-  const influenceSq = PHOTO_INFLUENCE_PX * PHOTO_INFLUENCE_PX;
+  const water = queryWaterPolygons(map);
 
   const features: Feature<Point, LandDotProps>[] = [];
   let index = 0;
 
-  for (let y = DOT_SPACING_PX / 2; y < height; y += DOT_SPACING_PX) {
-    for (let x = DOT_SPACING_PX / 2; x < width; x += DOT_SPACING_PX) {
-      const lngLat = map.unproject([x, y]);
-      const lng = lngLat.lng;
-      const lat = lngLat.lat;
-      if (lng < -180 || lng > 180 || lat < -85 || lat > 85) continue;
+  for (let lat = bounds.minLat + step / 2; lat < bounds.maxLat; lat += step) {
+    for (let lng = bounds.minLng + step / 2; lng < bounds.maxLng; lng += step) {
       if (isInWater(lng, lat, water)) continue;
 
       let count = 0;
-      for (const photo of photoScreens) {
-        const dx = photo.x - x;
-        const dy = photo.y - y;
-        if (dx * dx + dy * dy <= influenceSq) count += 1;
+      for (const photo of photos) {
+        if (approxDistance({ lat, lng }, photo) <= influence) count += 1;
       }
 
       features.push({
@@ -62,18 +54,19 @@ export function buildLandDotGrid(
   return { type: "FeatureCollection", features };
 }
 
-function queryWaterPolygons(map: MapboxMap, width: number, height: number): GeoJSON.Feature[] {
+function queryWaterPolygons(map: MapboxMap): GeoJSON.Feature[] {
   try {
+    const canvas = map.getCanvas();
     const rendered = map.queryRenderedFeatures(
       [
         [0, 0],
-        [width, height],
+        [canvas.clientWidth, canvas.clientHeight],
       ],
       { layers: [WATER_QUERY_LAYER] },
     );
     if (rendered.length > 0) return rendered;
   } catch {
-    // 레이어가 아직 없으면 소스에서 가져옵니다.
+    // ignore
   }
   return map.querySourceFeatures(MAPBOX_STREETS_SOURCE, { sourceLayer: "water" });
 }

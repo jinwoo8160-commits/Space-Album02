@@ -5,12 +5,11 @@
  *
  * 흐름:
  *  photos → 국가/날짜/색 필터 → filteredPhotos
- *        → (줌 0~7) 배경 도트 격자 (밀도 = opacity)
- *        → (줌 7~9.5) 사진 좌표 Circle
- *        → (줌 9.5+) 위성/상세 지도 + 묶음·개별 핀
+ *        → (줌 0~9.5) 육지 도트 격자 (밀도 = opacity)
+ *        → (줌 9.5+) 흰 모노톤 상세 지도 + 묶음·개별 핀
  *
  * 줌은 Mapbox GL 인스턴스의 실제 zoom 입니다.
- * 휠/핀치는 연속으로 움직이고, 레이어 전환은 7.0 / 9.5 를 넘은 뒤 조작이 끝났을 때 1회만 합니다.
+ * 휠/핀치는 연속으로 움직이고, 레이어 전환은 줌 9.5를 넘은 뒤 조작이 끝났을 때 1회만 합니다.
  */
 
 import { COUNTRY_BY_ID, COUNTRIES } from "@/data/country-masks";
@@ -22,7 +21,6 @@ import {
   CLUSTER_ZOOM,
   COUNTRY_FIT_MAX_ZOOM,
   DEFAULT_MAP_ZOOM,
-  DETAIL_ZOOM,
   overlayModeFromZoom,
   PIN_ZOOM,
 } from "@/lib/zoom";
@@ -60,7 +58,6 @@ type MapContextValue = {
   setMapZoom: (zoom: number) => void;
   overlayMode: OverlayMode;
   flyToClusters: (lat: number, lng: number) => void;
-  flyToDetail: (lat: number, lng: number) => void;
   flyToPins: (lat: number, lng: number) => void;
   selectedCategories: Set<CategoryFilterKey>;
   toggleCategory: (key: CategoryFilterKey) => void;
@@ -128,14 +125,6 @@ export function MapProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const flyToDetail = useCallback((lat: number, lng: number) => {
-    mapRef.current?.easeTo({
-      center: [lng, lat],
-      zoom: DETAIL_ZOOM,
-      duration: 650,
-    });
-  }, []);
-
   const flyToPins = useCallback((lat: number, lng: number) => {
     mapRef.current?.easeTo({
       center: [lng, lat],
@@ -177,7 +166,6 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setMapZoom,
     overlayMode,
     flyToClusters,
-    flyToDetail,
     flyToPins,
     selectedCategories,
     toggleCategory,
