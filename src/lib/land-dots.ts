@@ -16,8 +16,11 @@ import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
-/** 격자 칸 단위 영향 반지름. 체비셰프 5×5 네모를 피하고 원형으로 자릅니다. */
-const KERNEL_RADIUS_CELLS = 2.75;
+/**
+ * 유클리드 원판 반지름(격자 칸). 2.5~3칸은 점 격자에 다이아몬드로 찍혀
+ * 각져 보이므로, 모서리가 둥근 원형으로 읽히도록 4.5칸을 씁니다.
+ */
+const KERNEL_RADIUS_CELLS = 4.5;
 const KERNEL_SIGMA = KERNEL_RADIUS_CELLS / 2;
 
 export type LandDotProps = {
@@ -143,7 +146,8 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
         if (d > KERNEL_RADIUS_CELLS) continue;
         const neighbor = byGrid.get(`${best.row + dr}:${best.col + dc}`);
         if (!neighbor) continue;
-        neighbor.totalScore += Math.exp(-((d / KERNEL_SIGMA) * (d / KERNEL_SIGMA)));
+        const t = d / KERNEL_SIGMA;
+        neighbor.totalScore += Math.exp(-(t * t));
       }
     }
   }
