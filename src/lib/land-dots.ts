@@ -12,7 +12,7 @@ import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**
  * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
- * 사진→가장 가까운 도트에 유클리드 가우시안 커널로 점수를 퍼뜨리고, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
+ * 사진→가장 가까운 도트에 유클리드 가우시안 커널로 점수를 퍼뜨리고, 밀도 4단계는 격자 생성 시 1회만 계산합니다.
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
@@ -37,14 +37,12 @@ export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   1,
   1.0,
   2,
-  0.8,
+  0.75,
   3,
-  0.6,
+  0.5,
   4,
-  0.4,
-  5,
   0.25,
-  0.045,
+  0.1,
 ];
 
 type DotCell = {
@@ -154,13 +152,13 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
   }
 }
 
-/** totalScore > 0 인 도트만 상위 20% 단위 5분위. 1이 가장 짙음. */
+/** totalScore > 0 인 도트만 상위 25% 단위 4분위. 1이 가장 짙음. */
 function assignDensityLevels(cells: DotCell[]) {
   const occupied = cells.filter((cell) => cell.totalScore > 0);
   occupied.sort((a, b) => b.totalScore - a.totalScore || a.lat - b.lat);
   const n = occupied.length;
   occupied.forEach((cell, index) => {
-    const bucket = n <= 1 ? 0 : Math.min(4, Math.floor((index / n) * 5));
+    const bucket = n <= 1 ? 0 : Math.min(3, Math.floor((index / n) * 4));
     cell.densityLevel = bucket + 1;
   });
 }
