@@ -1,4 +1,4 @@
-import type { CategoryFilterKey } from "@/types/album";
+import type { CategoryColor, CategoryFilterKey } from "@/types/album";
 
 /**
  * TODO: [디자인] 첨부 이미지 스타일 반영 위치
@@ -13,6 +13,18 @@ export const CATEGORY_HEX: Record<Exclude<CategoryFilterKey, "unclassified">, st
 };
 
 export const UNCLASSIFIED_HEX = "#111111";
+
+export const DEFAULT_DOT_HEX = UNCLASSIFIED_HEX;
+
+export function hexForCategory(category: CategoryColor): string {
+  if (!category) return UNCLASSIFIED_HEX;
+  return CATEGORY_HEX[category];
+}
+
+export function hexForFilterKey(key: CategoryFilterKey): string {
+  if (key === "unclassified") return UNCLASSIFIED_HEX;
+  return CATEGORY_HEX[key];
+}
 
 export const CATEGORY_LABEL: Record<CategoryFilterKey, string> = {
   pink: "분홍",

@@ -4,15 +4,17 @@ import {
   KOREA_GRID_BOUNDS,
   KOREA_ISLAND_SEEDS,
 } from "@/data/korea-territory";
+import { hexForFilterKey, UNCLASSIFIED_HEX } from "@/lib/constants";
 import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
-import type { CountryId, Photo } from "@/types/album";
+import type { CategoryFilterKey, CountryId, Photo } from "@/types/album";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**
  * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
  * 사진→가장 가까운 도트에 유클리드 가우시안 커널로 점수를 퍼뜨리고, 밀도 4단계는 격자 생성 시 1회만 계산합니다.
+ * 카테고리 핀이 켜져 있으면 도트 색은 키컬러(또는 가중치 RGB 혼합)입니다.
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
@@ -29,6 +31,8 @@ export type LandDotProps = {
   totalScore: number;
   densityLevel: number;
   count: number;
+  color: string;
+  blendedColor: string;
 };
 
 export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
@@ -45,6 +49,11 @@ export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   0.1,
 ];
 
+export const DOT_COLOR_EXPR: ExpressionSpecification = [
+  "to-color",
+  ["coalesce", ["get", "color"], UNCLASSIFIED_HEX],
+];
+
 type DotCell = {
   lng: number;
   lat: number;
@@ -53,12 +62,15 @@ type DotCell = {
   photoCount: number;
   totalScore: number;
   densityLevel: number;
+  scoreByCategory: Map<string, number>;
+  color: string;
 };
 
 export function buildLandDotGrid(
   map: MapboxMap,
   photos: Photo[],
   countryId: CountryId,
+  colorize = false,
 ): FeatureCollection<Point, LandDotProps> {
   const bounds = countryId === "kr" ? KOREA_GRID_BOUNDS : COUNTRY_BY_ID[countryId].bounds;
   const latSpan = bounds.maxLat - bounds.minLat;
@@ -84,6 +96,8 @@ export function buildLandDotGrid(
       photoCount: 0,
       totalScore: 0,
       densityLevel: 0,
+      scoreByCategory: new Map(),
+      color: UNCLASSIFIED_HEX,
     };
     cells.push(cell);
     byGrid.set(key, cell);
@@ -105,6 +119,7 @@ export function buildLandDotGrid(
 
   spreadPhotoKernels(cells, byGrid, photos);
   assignDensityLevels(cells);
+  assignDotColors(cells, colorize);
 
   return {
     type: "FeatureCollection",
@@ -116,6 +131,8 @@ export function buildLandDotGrid(
         totalScore: cell.totalScore,
         densityLevel: cell.densityLevel,
         count: cell.totalScore,
+        color: cell.color,
+        blendedColor: cell.color,
       },
       geometry: { type: "Point", coordinates: [cell.lng, cell.lat] },
     })),
@@ -137,6 +154,7 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
     }
 
     best.photoCount += 1;
+    const categoryKey = photo.category ?? "unclassified";
 
     const reach = Math.ceil(KERNEL_RADIUS_CELLS);
     for (let dr = -reach; dr <= reach; dr += 1) {
@@ -146,7 +164,9 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
         const neighbor = byGrid.get(`${best.row + dr}:${best.col + dc}`);
         if (!neighbor) continue;
         const t = d / KERNEL_SIGMA;
-        neighbor.totalScore += Math.exp(-(t * t));
+        const weight = Math.exp(-(t * t));
+        neighbor.totalScore += weight;
+        neighbor.scoreByCategory.set(categoryKey, (neighbor.scoreByCategory.get(categoryKey) ?? 0) + weight);
       }
     }
   }
@@ -161,6 +181,43 @@ function assignDensityLevels(cells: DotCell[]) {
     const bucket = n <= 1 ? 0 : Math.min(3, Math.floor((index / n) * 4));
     cell.densityLevel = bucket + 1;
   });
+}
+
+function assignDotColors(cells: DotCell[], colorize: boolean) {
+  for (const cell of cells) {
+    if (!colorize || cell.totalScore <= 0) {
+      cell.color = UNCLASSIFIED_HEX;
+      continue;
+    }
+    cell.color = blendCategoryColors(cell.scoreByCategory);
+  }
+}
+
+function blendCategoryColors(scores: Map<string, number>): string {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let weight = 0;
+  scores.forEach((score, key) => {
+    if (score <= 0) return;
+        const [cr, cg, cb] = parseHex(hexForFilterKey(key as CategoryFilterKey));
+    r += cr * score;
+    g += cg * score;
+    b += cb * score;
+    weight += score;
+  });
+  if (weight <= 0) return UNCLASSIFIED_HEX;
+  return rgbToHex(r / weight, g / weight, b / weight);
+}
+
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(2, 4), 16), Number.parseInt(h.slice(4, 6), 16)];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const to = (n: number) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, "0");
+  return `#${to(r)}${to(g)}${to(b)}`;
 }
 
 function queryWaterPolygons(map: MapboxMap): GeoJSON.Feature[] {
