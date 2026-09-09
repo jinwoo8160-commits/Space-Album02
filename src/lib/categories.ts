@@ -20,6 +20,12 @@ export const CATEGORY_PRESET_HEX = [
   "#4D7CFE",
   "#C44569",
   "#2F3542",
+  "#FF9FF3",
+  "#54A0FF",
+  "#5F27CD",
+  "#10AC84",
+  "#EE5A24",
+  "#222F3E",
 ];
 
 export const CATEGORY_HEX: Record<string, string> = Object.fromEntries(

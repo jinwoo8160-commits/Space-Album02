@@ -103,7 +103,9 @@ export function AlbumMap() {
       if (!map?.isStyleLoaded()) return;
       if (!map.areTilesLoaded()) return;
 
-      const key = `color-v1:${countryRef.current}:${colorizeRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
+      const key = `color-v1:${countryRef.current}:${colorizeRef.current}:${photosRef.current
+        .map((photo) => `${photo.id}:${photo.category ?? "_"}`)
+        .join(",")}:${Object.keys(hexRef.current).join(",")}`;
       if (!force && gridKeyRef.current === key) return;
 
       ensureDotLayer(map);
