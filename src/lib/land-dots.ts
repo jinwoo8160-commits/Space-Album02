@@ -12,12 +12,17 @@ import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**
  * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
- * 사진→가장 가까운 도트 1개, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
+ * 사진→가장 가까운 도트에 5x5 커널로 점수를 퍼뜨리고, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
 
-export type LandDotProps = { photoCount: number; densityLevel: number; count: number };
+export type LandDotProps = {
+  photoCount: number;
+  totalScore: number;
+  densityLevel: number;
+  count: number;
+};
 
 export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   "match",
@@ -35,7 +40,19 @@ export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   0.1,
 ];
 
-type DotCell = { lng: number; lat: number; photoCount: number; densityLevel: number };
+const KERNEL_CENTER = 1;
+const KERNEL_RING1 = 0.5;
+const KERNEL_RING2 = 0.2;
+
+type DotCell = {
+  lng: number;
+  lat: number;
+  row: number;
+  col: number;
+  photoCount: number;
+  totalScore: number;
+  densityLevel: number;
+};
 
 export function buildLandDotGrid(
   map: MapboxMap,
@@ -46,29 +63,46 @@ export function buildLandDotGrid(
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = bounds.maxLng - bounds.minLng;
   const step = Math.max(latSpan, lngSpan) / GRID_CELLS;
+  const originLat = bounds.minLat + step / 2;
+  const originLng = bounds.minLng + step / 2;
   const water = queryWaterPolygons(map);
 
   const cells: DotCell[] = [];
+  const byGrid = new Map<string, DotCell>();
 
-  for (let lat = bounds.minLat + step / 2; lat < bounds.maxLat; lat += step) {
-    for (let lng = bounds.minLng + step / 2; lng < bounds.maxLng; lng += step) {
+  const pushCell = (lng: number, lat: number) => {
+    const col = Math.round((lng - originLng) / step);
+    const row = Math.round((lat - originLat) / step);
+    const key = `${row}:${col}`;
+    if (byGrid.has(key)) return;
+    const cell: DotCell = {
+      lng,
+      lat,
+      row,
+      col,
+      photoCount: 0,
+      totalScore: 0,
+      densityLevel: 0,
+    };
+    cells.push(cell);
+    byGrid.set(key, cell);
+  };
+
+  for (let lat = originLat; lat < bounds.maxLat; lat += step) {
+    for (let lng = originLng; lng < bounds.maxLng; lng += step) {
       if (countryId === "kr" && !isInKoreaTerritory(lng, lat)) continue;
       if (isInWater(lng, lat, water)) continue;
-      cells.push({ lng, lat, photoCount: 0, densityLevel: 0 });
+      pushCell(lng, lat);
     }
   }
 
   if (countryId === "kr") {
     for (const seed of KOREA_ISLAND_SEEDS) {
-      const already = cells.some(
-        (cell) => Math.abs(cell.lng - seed.lng) < step * 0.6 && Math.abs(cell.lat - seed.lat) < step * 0.6,
-      );
-      if (already) continue;
-      cells.push({ lng: seed.lng, lat: seed.lat, photoCount: 0, densityLevel: 0 });
+      pushCell(seed.lng, seed.lat);
     }
   }
 
-  assignPhotosToNearestDot(cells, photos);
+  spreadPhotoKernels(cells, byGrid, photos);
   assignDensityLevels(cells);
 
   return {
@@ -78,34 +112,47 @@ export function buildLandDotGrid(
       id: index,
       properties: {
         photoCount: cell.photoCount,
+        totalScore: cell.totalScore,
         densityLevel: cell.densityLevel,
-        count: cell.photoCount,
+        count: cell.totalScore,
       },
       geometry: { type: "Point", coordinates: [cell.lng, cell.lat] },
     })),
   };
 }
 
-function assignPhotosToNearestDot(cells: DotCell[], photos: Photo[]) {
+function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, photos: Photo[]) {
   if (cells.length === 0) return;
+
   for (const photo of photos) {
-    let best = 0;
+    let best = cells[0]!;
     let bestDist = Infinity;
-    for (let i = 0; i < cells.length; i += 1) {
-      const dist = approxDistance(cells[i]!, photo);
+    for (const cell of cells) {
+      const dist = approxDistance(cell, photo);
       if (dist < bestDist) {
         bestDist = dist;
-        best = i;
+        best = cell;
       }
     }
-    cells[best]!.photoCount += 1;
+
+    best.photoCount += 1;
+
+    for (let dr = -2; dr <= 2; dr += 1) {
+      for (let dc = -2; dc <= 2; dc += 1) {
+        const ring = Math.max(Math.abs(dr), Math.abs(dc));
+        const weight = ring === 0 ? KERNEL_CENTER : ring === 1 ? KERNEL_RING1 : KERNEL_RING2;
+        const neighbor = byGrid.get(`${best.row + dr}:${best.col + dc}`);
+        if (!neighbor) continue;
+        neighbor.totalScore += weight;
+      }
+    }
   }
 }
 
-/** 사진이 있는 도트만 상위 20% 단위 5분위로 나눕니다. 1이 가장 짙음. */
+/** totalScore > 0 인 도트만 상위 20% 단위 5분위. 1이 가장 짙음. */
 function assignDensityLevels(cells: DotCell[]) {
-  const occupied = cells.filter((cell) => cell.photoCount > 0);
-  occupied.sort((a, b) => b.photoCount - a.photoCount || a.lat - b.lat);
+  const occupied = cells.filter((cell) => cell.totalScore > 0);
+  occupied.sort((a, b) => b.totalScore - a.totalScore || a.lat - b.lat);
   const n = occupied.length;
   occupied.forEach((cell, index) => {
     const bucket = n <= 1 ? 0 : Math.min(4, Math.floor((index / n) * 5));
