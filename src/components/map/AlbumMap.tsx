@@ -6,10 +6,10 @@ import { COUNTRY_BY_ID } from "@/data/country-masks";
 import { useMap } from "@/context/map-context";
 import { clusterPhotos } from "@/lib/clustering";
 import { countryBounds, photosToDensityGeoJSON } from "@/lib/density-dots";
-import { CARTO_LIGHT_STYLE, MAP_STYLE } from "@/lib/map-style";
+import { CARTO_LIGHT_STYLE, loadMinimalGrayStyle } from "@/lib/map-style";
 import { DEFAULT_MAP_ZOOM, DOT_MAX_ZOOM } from "@/lib/zoom";
-import type { CircleLayerSpecification } from "maplibre-gl";
-import { useMemo, useState } from "react";
+import type { CircleLayerSpecification, StyleSpecification } from "maplibre-gl";
+import { useEffect, useMemo, useState } from "react";
 import Map, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -28,20 +28,23 @@ const DOT_LAYER: Omit<CircleLayerSpecification, "source"> = {
   type: "circle",
   maxzoom: DOT_MAX_ZOOM,
   paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 2.2, 5, 3.4],
-    "circle-color": "#161616",
+    // 반지름은 px 고정. 줌이 올라도 커져서 해안선을 가리지 않습니다.
+    "circle-radius": 2.4,
+    "circle-blur": 0,
+    "circle-color": "#111111",
+    // 밀도는 크기 대신 진하기(opacity)로만 표현합니다.
     "circle-opacity": [
       "interpolate",
       ["linear"],
       ["get", "count"],
       1,
-      0.28,
+      0.35,
       2,
-      0.5,
+      0.55,
       4,
-      0.74,
+      0.78,
       8,
-      0.92,
+      0.95,
     ],
     "circle-stroke-width": 0,
     "circle-pitch-alignment": "viewport",
@@ -62,7 +65,17 @@ export function AlbumMap() {
     selectedCountryId,
   } = useMap();
 
-  const [style, setStyle] = useState<string | typeof CARTO_LIGHT_STYLE>(MAP_STYLE);
+  const [style, setStyle] = useState<StyleSpecification>(CARTO_LIGHT_STYLE);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadMinimalGrayStyle().then((next) => {
+      if (!cancelled) setStyle(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const country = COUNTRY_BY_ID[selectedCountryId];
 
   const density = useMemo(() => photosToDensityGeoJSON(filteredPhotos), [filteredPhotos]);
@@ -93,7 +106,6 @@ export function AlbumMap() {
         });
       }}
       onMove={(event) => setMapZoom(event.viewState.zoom)}
-      onError={() => setStyle(CARTO_LIGHT_STYLE)}
       onClick={(event) => {
         const feature = event.features?.[0];
         if (!feature || feature.layer?.id !== "photo-dots") return;
