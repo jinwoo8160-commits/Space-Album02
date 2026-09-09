@@ -158,6 +158,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
 
   const handleSelectCountry = useCallback(
     (id: CountryId) => {
+      if (id !== "kr") return;
       setSelectedCountryId(id);
       setSelectedPhotoId(null);
       setCountryModalOpen(false);
