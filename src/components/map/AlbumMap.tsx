@@ -6,7 +6,7 @@ import { COUNTRY_BY_ID } from "@/data/country-masks";
 import { useMap } from "@/context/map-context";
 import { clusterPhotos } from "@/lib/clustering";
 import { countryBounds, photosToDensityGeoJSON } from "@/lib/density-dots";
-import { CARTO_LIGHT_STYLE, loadMinimalGrayStyle } from "@/lib/map-style";
+import { loadMinimalGrayStyle } from "@/lib/map-style";
 import { DEFAULT_MAP_ZOOM, DOT_MAX_ZOOM } from "@/lib/zoom";
 import type { CircleLayerSpecification, StyleSpecification } from "maplibre-gl";
 import { useEffect, useMemo, useState } from "react";
@@ -65,7 +65,7 @@ export function AlbumMap() {
     selectedCountryId,
   } = useMap();
 
-  const [style, setStyle] = useState<StyleSpecification>(CARTO_LIGHT_STYLE);
+  const [style, setStyle] = useState<StyleSpecification | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +83,14 @@ export function AlbumMap() {
     () => clusterPhotos(filteredPhotos, overlayMode, mapZoom),
     [filteredPhotos, overlayMode, mapZoom],
   );
+
+  if (!style) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#f3f3f1] text-sm text-neutral-400">
+        지도를 불러오는 중…
+      </div>
+    );
+  }
 
   return (
     <Map
@@ -136,6 +144,9 @@ export function AlbumMap() {
               longitude={cluster.lng}
               latitude={cluster.lat}
               anchor="center"
+              pitchAlignment="viewport"
+              rotationAlignment="viewport"
+              style={{ pointerEvents: "auto" }}
             >
               {overlayMode === "pins" && cluster.photos.length === 1 ? (
                 <PhotoPin
