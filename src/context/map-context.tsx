@@ -1,45 +1,44 @@
 "use client";
 
 /**
- * 지도 화면의 "단일 진실 공급원(Single Source of Truth)".
- *
- * 왜 Context 를 쓰나요?
- * MapScreen 아래에는 국가 버튼, 컬러핀, 도트맵, 타임피커, 상세 팝업이 따로 있습니다.
- * 이 모든 것이 같은 사진 배열·같은 필터를 봐야 합니다.
- * props 로 5단계 내려보내면 중간 컴포넌트가 안 쓰는 값까지 전달하게 되어
- * "데이터가 어디서 바뀌는지" 추적이 어려워집니다.
+ * 지도 화면의 단일 진실 공급원.
  *
  * 흐름:
- *  photos (카테고리 수정 가능)
- *    → country / time / color 필터
- *    → filteredPhotos
- *    → DotMap 은 개수로 명암, StreetMap 은 묶음/핀
+ *  photos → 국가/날짜/색 필터 → filteredPhotos
+ *        → (줌 0~5) Circle 도트 GeoJSON
+ *        → (줌 6~11) 묶음 핀
+ *        → (줌 12+) 개별 핀
+ *
+ * 줌은 우리 state 가 아니라 MapLibre 지도 인스턴스의 실제 zoom 입니다.
+ * +/- 버튼도 map.zoomIn() 을 호출해, 레이어 전환 기준(0~5 / 6~11 / 12+)과 어긋나지 않게 합니다.
  */
 
 import { COUNTRY_BY_ID, COUNTRIES } from "@/data/country-masks";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
+import { countryBounds } from "@/lib/density-dots";
 import { maskToDots } from "@/lib/geo";
 import { filterPhotos } from "@/lib/filters";
-import { defaultFocusFromPhotos, focusForZoom, nextZoom, prevZoom } from "@/lib/zoom";
+import { CLUSTER_ZOOM, DEFAULT_MAP_ZOOM, overlayModeFromZoom, PIN_ZOOM } from "@/lib/zoom";
 import type {
   CategoryColor,
   CategoryFilterKey,
   CountryId,
-  MapFocus,
+  OverlayMode,
   Photo,
   TimeFilter,
-  ZoomLevel,
 } from "@/types/album";
 import {
   createContext,
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
+import type { MapRef } from "react-map-gl/maplibre";
 
-/** 마스크 → 점 변환은 앱이 켜지는 동안 한 번만. 줌이 바뀐다고 다시 파싱하지 않습니다. */
 export const COUNTRY_DOTS = Object.fromEntries(
   COUNTRIES.map((country) => [country.id, maskToDots(country)]),
 ) as Record<CountryId, ReturnType<typeof maskToDots>>;
@@ -49,12 +48,14 @@ type MapContextValue = {
   filteredPhotos: Photo[];
   selectedCountryId: CountryId;
   setSelectedCountryId: (id: CountryId) => void;
-  zoomLevel: ZoomLevel;
-  focus: MapFocus | null;
-  zoomIn: (around?: { lat: number; lng: number }) => void;
+  mapRef: RefObject<MapRef | null>;
+  mapZoom: number;
+  setMapZoom: (zoom: number) => void;
+  overlayMode: OverlayMode;
+  zoomIn: () => void;
   zoomOut: () => void;
-  jumpToCity: (lat: number, lng: number) => void;
-  jumpToNeighborhood: (lat: number, lng: number) => void;
+  flyToClusters: (lat: number, lng: number) => void;
+  flyToPins: (lat: number, lng: number) => void;
   selectedCategories: Set<CategoryFilterKey>;
   toggleCategory: (key: CategoryFilterKey) => void;
   timeFilter: TimeFilter;
@@ -71,33 +72,22 @@ type MapContextValue = {
 const MapContext = createContext<MapContextValue | null>(null);
 
 export function MapProvider({ children }: { children: ReactNode }) {
-  /**
-   * mock 을 그대로 쓰지 않고 state 로 복사하는 이유:
-   * 상세 팝업에서 색을 바꾸면 지도 테두리/도트 색이 바로 바뀌어야 합니다.
-   * 모듈 상수 MOCK_PHOTOS 를 직접 고치면, 새로고침 전까지 다른 화면도 오염되고
-   * React 는 배열이 바뀐 줄 모릅니다 (같은 참조).
-   */
+  const mapRef = useRef<MapRef>(null);
   const [photos, setPhotos] = useState<Photo[]>(MOCK_PHOTOS);
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>("kr");
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("country");
-  const [focus, setFocus] = useState<MapFocus | null>(null);
-
-  /**
-   * Set 을 state 에 넣는 패턴: 토글할 때마다 새 Set 을 만듭니다.
-   * 같은 Set 인스턴스를 mutate 하면 React 가 변경을 감지하지 못합니다.
-   */
+  const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
   const [selectedCategories, setSelectedCategories] = useState<Set<CategoryFilterKey>>(
     () => new Set(),
   );
-
   const [timeFilter, setTimeFilter] = useState<TimeFilter>({
     year: latestPhotoYear(MOCK_PHOTOS),
     month: null,
     day: null,
   });
-
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [countryModalOpen, setCountryModalOpen] = useState(false);
+
+  const overlayMode = overlayModeFromZoom(mapZoom);
 
   const filteredPhotos = useMemo(
     () => filterPhotos(photos, selectedCountryId, timeFilter, selectedCategories),
@@ -124,50 +114,51 @@ export function MapProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const zoomIn = useCallback(
-    (around?: { lat: number; lng: number }) => {
-      const upcoming = nextZoom(zoomLevel);
-      const target =
-        around ??
-        (filteredPhotos[0]
-          ? { lat: filteredPhotos[0].lat, lng: filteredPhotos[0].lng }
-          : null);
-      setZoomLevel(upcoming);
-      if (target) setFocus(focusForZoom(upcoming, target.lat, target.lng));
-      else setFocus(null);
-    },
-    [filteredPhotos, zoomLevel],
-  );
+  const zoomIn = useCallback(() => {
+    mapRef.current?.zoomIn({ duration: 280 });
+  }, []);
 
   const zoomOut = useCallback(() => {
-    const upcoming = prevZoom(zoomLevel);
     setSelectedPhotoId(null);
-    setZoomLevel(upcoming);
-    if (upcoming === "country" || upcoming === "province") setFocus(null);
-  }, [zoomLevel]);
-
-  const jumpToCity = useCallback((lat: number, lng: number) => {
-    setZoomLevel("city");
-    setFocus(focusForZoom("city", lat, lng));
+    mapRef.current?.zoomOut({ duration: 280 });
   }, []);
 
-  const jumpToNeighborhood = useCallback((lat: number, lng: number) => {
-    setZoomLevel("neighborhood");
-    setFocus(focusForZoom("neighborhood", lat, lng));
+  const flyToClusters = useCallback((lat: number, lng: number) => {
+    mapRef.current?.easeTo({
+      center: [lng, lat],
+      zoom: CLUSTER_ZOOM,
+      duration: 650,
+    });
   }, []);
 
-  const handleSelectCountry = useCallback((id: CountryId) => {
-    setSelectedCountryId(id);
-    setZoomLevel("country");
-    setFocus(null);
-    setSelectedPhotoId(null);
-    setCountryModalOpen(false);
-    // 나라를 바꾸면 그 나라에 사진이 있는 최신 연도로 맞춰, 빈 화면부터 시작하지 않게 합니다.
-    const inCountry = photos.filter((photo) => photo.countryId === id);
-    if (inCountry.length > 0) {
-      setTimeFilter((prev) => ({ ...prev, year: latestPhotoYear(inCountry) }));
-    }
-  }, [photos]);
+  const flyToPins = useCallback((lat: number, lng: number) => {
+    mapRef.current?.easeTo({
+      center: [lng, lat],
+      zoom: PIN_ZOOM,
+      duration: 650,
+    });
+  }, []);
+
+  const handleSelectCountry = useCallback(
+    (id: CountryId) => {
+      setSelectedCountryId(id);
+      setSelectedPhotoId(null);
+      setCountryModalOpen(false);
+      const inCountry = photos.filter((photo) => photo.countryId === id);
+      if (inCountry.length > 0) {
+        setTimeFilter((prev) => ({ ...prev, year: latestPhotoYear(inCountry) }));
+      }
+      // 나라 전체 프레임으로 맞추되 maxZoom 5.4 → 항상 도트 레이어 구간에서 시작합니다.
+      requestAnimationFrame(() => {
+        mapRef.current?.fitBounds(countryBounds(id), {
+          padding: 48,
+          maxZoom: 5.4,
+          duration: 900,
+        });
+      });
+    },
+    [photos],
+  );
 
   const openPhoto = useCallback((id: string) => setSelectedPhotoId(id), []);
   const closePhoto = useCallback(() => setSelectedPhotoId(null), []);
@@ -177,16 +168,14 @@ export function MapProvider({ children }: { children: ReactNode }) {
     filteredPhotos,
     selectedCountryId,
     setSelectedCountryId: handleSelectCountry,
-    zoomLevel,
-    // 도시/동 수준에서만 초점이 필요합니다. 국가·시/도는 나라 전체 도트맵을 그립니다.
-    focus:
-      zoomLevel === "city" || zoomLevel === "neighborhood"
-        ? (focus ?? defaultFocusFromPhotos(filteredPhotos))
-        : focus,
+    mapRef,
+    mapZoom,
+    setMapZoom,
+    overlayMode,
     zoomIn,
     zoomOut,
-    jumpToCity,
-    jumpToNeighborhood,
+    flyToClusters,
+    flyToPins,
     selectedCategories,
     toggleCategory,
     timeFilter,

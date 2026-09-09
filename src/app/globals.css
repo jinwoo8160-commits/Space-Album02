@@ -129,3 +129,19 @@
     @apply font-sans;
   }
 }
+
+/* MapLibre: 해안선이 있는 실제 지도. 저작권 표기는 타임피커와 겹치지 않게 올립니다. */
+.maplibregl-ctrl-bottom-right {
+  bottom: 168px !important;
+  right: 6px !important;
+}
+.maplibregl-ctrl-bottom-left {
+  display: none;
+}
+.maplibregl-canvas {
+  outline: none;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  background: rgb(255 255 255 / 0.75) !important;
+}

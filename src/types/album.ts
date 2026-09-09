@@ -17,11 +17,17 @@ export type CategoryColor = "pink" | "green" | "cyan" | "red" | null;
 export type CategoryFilterKey = "pink" | "green" | "cyan" | "red" | "unclassified";
 
 /**
- * 줌 단계를 숫자(0~3)가 아니라 이름로 둔 이유:
- * if (zoom === 2) 는 "2가 구/시인지" 매번 기억해야 하지만,
- * if (zoomLevel === "city") 는 조건문 자체가 설명이 됩니다.
+ * 줌에 따라 올라가는 레이어 종류.
+ * 숫자는 지도 엔진 줌이고, 이 이름은 "지금 무엇을 그릴지"입니다.
+ *
+ * 0~5   dots      미세 Circle 도트
+ * 6~11  clusters  사진 묶음 핀
+ * 12+   pins      개별 사진 핀
  */
-export type ZoomLevel = "country" | "province" | "city" | "neighborhood";
+export type OverlayMode = "dots" | "clusters" | "pins";
+
+/** @deprecated OverlayMode 를 쓰세요. 예전 4단계 이름과의 호환용 별칭 */
+export type ZoomLevel = OverlayMode;
 
 export type CountryId = "kr" | "jp" | "cn" | "us";
 

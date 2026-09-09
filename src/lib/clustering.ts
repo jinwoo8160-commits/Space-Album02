@@ -1,27 +1,26 @@
-import {
-  CITY_CLUSTER_CELL,
-  NEIGHBORHOOD_COORD_PRECISION,
-} from "@/lib/constants";
-import type { Photo, PhotoCluster, ZoomLevel } from "@/types/album";
+import { clusterCellSize } from "@/lib/zoom";
+import { NEIGHBORHOOD_COORD_PRECISION } from "@/lib/constants";
+import type { OverlayMode, Photo, PhotoCluster } from "@/types/album";
 
 /**
- * 줌 단계에 따라 "묶는 단위"가 달라집니다.
+ * 줌 6~11 은 "근처끼리 묶음", 12+ 는 "같은 좌표만 묶음".
  *
- * city        : 근처 좌표를 격자(그리드)로 묶어 스택+숫자 배지
- * neighborhood: 완전히 같은 좌표만 묶음 (요구사항: 동일 좌표만)
- *
- * 왜 격자인가?
- * 클러스터링 알고리즘(DBSCAN 등)은 강력하지만 학습용 1차 구현에는 무겁습니다.
- * lat/lng 를 칸 크기로 나눈 정수 키가 있으면, 같은 키 = 같은 묶음이 됩니다.
+ * 왜 MapLibre 내장 cluster 를 안 쓰나요?
+ * 내장 클러스터는 숫자 뱃지 원만 그릴 수 있습니다.
+ * 스케치의 폴라로이드 스택은 HTML 마커가 필요해서, 묶는 계산만 JS 로 하고
+ * 그리기는 Marker 컴포넌트에 맡깁니다.
  */
-export function clusterPhotos(photos: Photo[], zoomLevel: ZoomLevel): PhotoCluster[] {
+export function clusterPhotos(photos: Photo[], mode: OverlayMode, zoom: number): PhotoCluster[] {
+  if (mode === "dots") return [];
+
   const groups = new Map<string, Photo[]>();
+  const cell = clusterCellSize(zoom);
 
   photos.forEach((photo) => {
     const key =
-      zoomLevel === "neighborhood"
+      mode === "pins"
         ? `${photo.lat.toFixed(NEIGHBORHOOD_COORD_PRECISION)}_${photo.lng.toFixed(NEIGHBORHOOD_COORD_PRECISION)}`
-        : `${Math.round(photo.lat / CITY_CLUSTER_CELL)}_${Math.round(photo.lng / CITY_CLUSTER_CELL)}`;
+        : `${Math.round(photo.lat / cell)}_${Math.round(photo.lng / cell)}`;
 
     const list = groups.get(key);
     if (list) list.push(photo);

@@ -1,4 +1,4 @@
-import type { CategoryFilterKey, ZoomLevel } from "@/types/album";
+import type { CategoryFilterKey } from "@/types/album";
 
 /**
  * TODO: [디자인] 첨부 이미지 스타일 반영 위치
@@ -22,28 +22,8 @@ export const CATEGORY_LABEL: Record<CategoryFilterKey, string> = {
   unclassified: "미분류",
 };
 
-export const ZOOM_ORDER: ZoomLevel[] = [
-  "country",
-  "province",
-  "city",
-  "neighborhood",
-];
-
-export const ZOOM_LABEL: Record<ZoomLevel, string> = {
-  country: "국가 수준",
-  province: "시/도 수준",
-  city: "구/시 수준",
-  neighborhood: "동/군/구 수준",
-};
-
-/** 도시 수준 클러스터 격자 크기(도). 약 2~3km 단위로 묶습니다. */
-export const CITY_CLUSTER_CELL = 0.03;
-
 /** 동 수준에서 "같은 좌표"로 볼 반올림 자릿수. */
 export const NEIGHBORHOOD_COORD_PRECISION = 5;
-
-export const CITY_FOCUS_SPAN = 0.22;
-export const NEIGHBORHOOD_FOCUS_SPAN = 0.055;
 
 /** 활성 탭 아이콘 색 — 스케치의 노란 골드 */
 export const TAB_ACTIVE = "#E6C84A";
