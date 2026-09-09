@@ -10,7 +10,7 @@
  *        → (줌 12+) 개별 핀
  *
  * 줌은 Mapbox GL 인스턴스의 실제 zoom 입니다.
- * 휠/핀치가 연속으로 바꾸고, 레이어는 그 숫자에 맞춰 페이드됩니다.
+ * 휠/핀치는 연속으로 움직이고, 레이어 전환은 줌 5.0 임계점을 넘은 뒤 조작이 끝났을 때 1회만 합니다.
  */
 
 import { COUNTRY_BY_ID, COUNTRIES } from "@/data/country-masks";
@@ -18,7 +18,13 @@ import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
 import { maskToDots } from "@/lib/geo";
 import { filterPhotos } from "@/lib/filters";
-import { CLUSTER_ZOOM, DEFAULT_MAP_ZOOM, overlayModeFromZoom, PIN_ZOOM } from "@/lib/zoom";
+import {
+  CLUSTER_ZOOM,
+  COUNTRY_FIT_MAX_ZOOM,
+  DEFAULT_MAP_ZOOM,
+  overlayModeFromZoom,
+  PIN_ZOOM,
+} from "@/lib/zoom";
 import type {
   CategoryColor,
   CategoryFilterKey,
@@ -137,11 +143,10 @@ export function MapProvider({ children }: { children: ReactNode }) {
       if (inCountry.length > 0) {
         setTimeFilter((prev) => ({ ...prev, year: latestPhotoYear(inCountry) }));
       }
-      // 나라 전체 프레임으로 맞추되 maxZoom 5.4 → 항상 도트 레이어 구간에서 시작합니다.
       requestAnimationFrame(() => {
         mapRef.current?.fitBounds(countryBounds(id), {
           padding: 48,
-          maxZoom: 5.4,
+          maxZoom: COUNTRY_FIT_MAX_ZOOM,
           duration: 900,
         });
       });
