@@ -49,10 +49,12 @@ export function MapScreen() {
       <p className="pointer-events-none absolute bottom-52 left-0 right-0 text-center text-[11px] text-neutral-500">
         휠·트랙패드·핀치로 연속 줌 ·{" "}
         {overlayMode === "dots"
-          ? "점의 진하기 = 사진 밀도 · 줌 5에서 핀으로 전환"
-          : overlayMode === "clusters"
-            ? "묶음을 누르면 거리 수준으로 들어갑니다"
-            : "사진을 누르면 상세가 열립니다"}
+          ? "점의 진하기 = 사진 밀도 · 줌 7에서 사진 도트로"
+          : overlayMode === "dataDots"
+            ? "사진 위치 도트 · 줌 9.5에서 위성 지도로"
+            : overlayMode === "clusters"
+              ? "묶음을 누르면 거리 수준으로 들어갑니다"
+              : "사진을 누르면 상세가 열립니다"}
       </p>
 
       <CountrySelectModal />

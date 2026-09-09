@@ -7,15 +7,26 @@ import { PhotoPin } from "@/components/map/PhotoPin";
 import { useMap } from "@/context/map-context";
 import { clusterPhotos } from "@/lib/clustering";
 import { buildLandDotGrid, DOT_RADIUS_PX } from "@/lib/land-dots";
-import { DOT_MAP_STYLE, MAPBOX_TOKEN } from "@/lib/map-style";
-import { CLUSTER_MAX_ZOOM, DEFAULT_MAP_ZOOM, DOT_ZOOM_THRESHOLD } from "@/lib/zoom";
+import { applyMapStage } from "@/lib/map-stage";
+import {
+  DOT_MAP_STYLE,
+  LAND_GRID_LAYER,
+  LAND_GRID_SOURCE,
+  MAPBOX_TOKEN,
+  PHOTO_DOTS_LAYER,
+  PHOTO_DOTS_SOURCE,
+} from "@/lib/map-style";
+import { photosToPhotoDotsGeoJSON, PHOTO_DOT_COLOR_EXPR } from "@/lib/photo-dots";
+import {
+  DEFAULT_MAP_ZOOM,
+  LAND_DOTS_MAX_ZOOM,
+  PHOTO_DOTS_MAX_ZOOM,
+  type MapStage,
+} from "@/lib/zoom";
 import type { MapLayerMouseEvent } from "mapbox-gl";
 import mapboxgl from "mapbox-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
-
-const SOURCE_ID = "land-grid";
-const LAYER_ID = "land-grid-circles";
 
 function MissingMapboxToken() {
   return (
@@ -26,48 +37,78 @@ function MissingMapboxToken() {
   );
 }
 
-function ensureLandGridLayer(map: mapboxgl.Map) {
-  if (!map.getSource(SOURCE_ID)) {
-    map.addSource(SOURCE_ID, {
+function ensureDotLayers(map: mapboxgl.Map) {
+  if (!map.getSource(LAND_GRID_SOURCE)) {
+    map.addSource(LAND_GRID_SOURCE, {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
     });
   }
-  if (!map.getLayer(LAYER_ID)) {
+  if (!map.getLayer(LAND_GRID_LAYER)) {
     map.addLayer({
-      id: LAYER_ID,
+      id: LAND_GRID_LAYER,
       type: "circle",
-      source: SOURCE_ID,
+      source: LAND_GRID_SOURCE,
       layout: { visibility: "visible" },
       paint: {
         "circle-radius": DOT_RADIUS_PX,
         "circle-pitch-alignment": "viewport",
-        "circle-color": [
+        "circle-color": "#111111",
+        "circle-opacity": [
           "interpolate",
           ["linear"],
           ["coalesce", ["get", "count"], 0],
           0,
-          "#E5E5E5",
+          0.16,
           1,
-          "#B5B5B5",
-          2,
-          "#7A7A7A",
-          4,
-          "#3F3F3F",
+          0.42,
+          3,
+          0.72,
           7,
-          "#111111",
+          1,
         ],
-        "circle-opacity": 1,
       },
     });
   }
-}
 
-function setDotsVisible(map: mapboxgl.Map, visible: boolean) {
-  if (!map.getLayer(LAYER_ID)) return;
-  const next = visible ? "visible" : "none";
-  if (map.getLayoutProperty(LAYER_ID, "visibility") === next) return;
-  map.setLayoutProperty(LAYER_ID, "visibility", next);
+  if (!map.getSource(PHOTO_DOTS_SOURCE)) {
+    map.addSource(PHOTO_DOTS_SOURCE, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+  }
+  if (!map.getLayer(PHOTO_DOTS_LAYER)) {
+    map.addLayer({
+      id: PHOTO_DOTS_LAYER,
+      type: "circle",
+      source: PHOTO_DOTS_SOURCE,
+      layout: { visibility: "none" },
+      paint: {
+        "circle-pitch-alignment": "viewport",
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["coalesce", ["get", "count"], 1],
+          1,
+          5.5,
+          4,
+          8.5,
+        ],
+        "circle-color": PHOTO_DOT_COLOR_EXPR as unknown as mapboxgl.ExpressionSpecification,
+        "circle-opacity": [
+          "interpolate",
+          ["linear"],
+          ["coalesce", ["get", "count"], 1],
+          1,
+          0.82,
+          4,
+          1,
+        ],
+        "circle-stroke-width": 1.2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+  }
 }
 
 export function AlbumMap() {
@@ -78,6 +119,7 @@ export function AlbumMap() {
     mapRef,
     openPhoto,
     flyToClusters,
+    flyToDetail,
     flyToPins,
     overlayMode,
   } = useMap();
@@ -85,26 +127,31 @@ export function AlbumMap() {
   const [mapReady, setMapReady] = useState(false);
   const settleTimer = useRef<number | null>(null);
   const interactingRef = useRef(false);
+  const stageRef = useRef<MapStage | null>(null);
   const photosRef = useRef(filteredPhotos);
   photosRef.current = filteredPhotos;
 
   const clusters = useMemo(() => {
-    if (overlayMode === "dots") return [];
-    return clusterPhotos(
-      filteredPhotos,
-      overlayMode === "pins" ? "pins" : "clusters",
-      mapZoom,
-    );
+    if (overlayMode !== "clusters" && overlayMode !== "pins") return [];
+    return clusterPhotos(filteredPhotos, overlayMode === "pins" ? "pins" : "clusters", mapZoom);
   }, [filteredPhotos, mapZoom, overlayMode]);
 
-  const rebuildGrid = useCallback(() => {
+  const syncPhotoDots = useCallback(() => {
     const map = mapRef.current?.getMap();
     if (!map?.isStyleLoaded()) return;
-    if (map.getZoom() >= DOT_ZOOM_THRESHOLD) return;
+    ensureDotLayers(map);
+    const source = map.getSource(PHOTO_DOTS_SOURCE) as mapboxgl.GeoJSONSource | undefined;
+    source?.setData(photosToPhotoDotsGeoJSON(photosRef.current));
+  }, [mapRef]);
+
+  const rebuildLandGrid = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map?.isStyleLoaded()) return;
+    if (map.getZoom() >= LAND_DOTS_MAX_ZOOM) return;
     if (!map.areTilesLoaded()) return;
 
-    ensureLandGridLayer(map);
-    const source = map.getSource(SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+    ensureDotLayers(map);
+    const source = map.getSource(LAND_GRID_SOURCE) as mapboxgl.GeoJSONSource | undefined;
     source?.setData(buildLandDotGrid(map, photosRef.current));
   }, [mapRef]);
 
@@ -120,7 +167,8 @@ export function AlbumMap() {
     const map = mapRef.current?.getMap();
     if (!map) return;
 
-    ensureLandGridLayer(map);
+    ensureDotLayers(map);
+    syncPhotoDots();
 
     const onInteractionStart = () => {
       interactingRef.current = true;
@@ -132,18 +180,18 @@ export function AlbumMap() {
       settleTimer.current = window.setTimeout(() => {
         if (!map.isStyleLoaded()) return;
         const zoom = map.getZoom();
-        const showDots = zoom < DOT_ZOOM_THRESHOLD;
-        ensureLandGridLayer(map);
-        setDotsVisible(map, showDots);
+        ensureDotLayers(map);
+        stageRef.current = applyMapStage(map, zoom, stageRef.current);
         setMapZoom(zoom);
-        if (showDots) rebuildGrid();
+        if (zoom < LAND_DOTS_MAX_ZOOM) rebuildLandGrid();
       }, 80);
     };
 
     const onSourceData = (event: mapboxgl.MapSourceDataEvent) => {
       if (interactingRef.current) return;
-      if (!event.isSourceLoaded || event.sourceId !== "mapbox-streets") return;
-      if (map.getZoom() >= DOT_ZOOM_THRESHOLD) return;
+      if (!event.isSourceLoaded) return;
+      if (event.sourceId !== "mapbox-streets" && event.sourceId !== "mapbox-satellite") return;
+      if (map.getZoom() >= LAND_DOTS_MAX_ZOOM) return;
       onSettled();
     };
 
@@ -162,36 +210,38 @@ export function AlbumMap() {
       map.off("sourcedata", onSourceData);
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
     };
-  }, [mapReady, mapRef, rebuildGrid, setMapZoom]);
+  }, [mapReady, mapRef, rebuildLandGrid, setMapZoom, syncPhotoDots]);
 
   useEffect(() => {
     if (interactingRef.current) return;
-    if (overlayMode !== "dots") return;
-    rebuildGrid();
-  }, [filteredPhotos, overlayMode, rebuildGrid]);
+    syncPhotoDots();
+    if (overlayMode === "dots") rebuildLandGrid();
+  }, [filteredPhotos, overlayMode, rebuildLandGrid, syncPhotoDots]);
 
   const handleMapClick = useCallback(
     (event: MapLayerMouseEvent) => {
       const map = mapRef.current?.getMap();
       if (!map) return;
       const zoom = map.getZoom();
-      if (zoom < DOT_ZOOM_THRESHOLD) {
+      if (zoom < LAND_DOTS_MAX_ZOOM) {
         flyToClusters(event.lngLat.lat, event.lngLat.lng);
         return;
       }
-      if (zoom < CLUSTER_MAX_ZOOM) {
-        flyToPins(event.lngLat.lat, event.lngLat.lng);
+      if (zoom < PHOTO_DOTS_MAX_ZOOM) {
+        flyToDetail(event.lngLat.lat, event.lngLat.lng);
       }
     },
-    [flyToClusters, flyToPins, mapRef],
+    [flyToClusters, flyToDetail, mapRef],
   );
 
   if (!MAPBOX_TOKEN) {
     return <MissingMapboxToken />;
   }
 
+  const canvasBg = overlayMode === "clusters" || overlayMode === "pins" ? "#0b0b0b" : "#ffffff";
+
   return (
-    <div className="absolute inset-0 bg-white">
+    <div className="absolute inset-0" style={{ background: canvasBg }}>
       <Map
         ref={handleRef}
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -213,7 +263,7 @@ export function AlbumMap() {
         onLoad={() => setMapReady(true)}
         onClick={handleMapClick}
         cursor="grab"
-        style={{ width: "100%", height: "100%", background: "#ffffff" }}
+        style={{ width: "100%", height: "100%", background: canvasBg }}
       >
         {overlayMode === "clusters"
           ? clusters.map((cluster) => (

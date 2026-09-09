@@ -1,16 +1,18 @@
-import { clusterCellSize } from "@/lib/zoom";
+import { clusterCellSize, CLUSTER_MAX_ZOOM } from "@/lib/zoom";
 import { NEIGHBORHOOD_COORD_PRECISION } from "@/lib/constants";
-import type { OverlayMode, Photo, PhotoCluster } from "@/types/album";
+import type { Photo, PhotoCluster } from "@/types/album";
 
 /**
- * 줌 5 이상은 근처끼리 묶음, 12+ 는 같은 좌표만.
+ * 줌 9.5~12 는 근처끼리 묶음, 12+ 는 같은 좌표만.
  * HTML 폴라로이드 스택을 그려야 해서 Mapbox 내장 cluster(숫자 원)는 쓰지 않습니다.
- *
- * 호출은 zoomend 이후 overlayMode 가 clusters/pins 일 때만 합니다.
  */
-export function clusterPhotos(photos: Photo[], mode: OverlayMode, zoom: number): PhotoCluster[] {
+export function clusterPhotos(
+  photos: Photo[],
+  mode: "clusters" | "pins",
+  zoom: number,
+): PhotoCluster[] {
   const groups = new Map<string, Photo[]>();
-  const cell = clusterCellSize(Math.max(zoom, 6));
+  const cell = clusterCellSize(Math.max(zoom, CLUSTER_MAX_ZOOM - 2));
 
   photos.forEach((photo) => {
     const key =
