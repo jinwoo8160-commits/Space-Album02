@@ -82,7 +82,7 @@ export function AlbumMap() {
       if (!map?.isStyleLoaded()) return;
       if (!map.areTilesLoaded()) return;
 
-      const key = `gaussian-v2:${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
+      const key = `gaussian-v3:${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
       if (!force && gridKeyRef.current === key) return;
 
       ensureDotLayer(map);

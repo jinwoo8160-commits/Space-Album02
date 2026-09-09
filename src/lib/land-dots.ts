@@ -21,7 +21,8 @@ const GRID_CELLS = 130;
  * 각져 보이므로, 모서리가 둥근 원형으로 읽히도록 4.5칸을 씁니다.
  */
 const KERNEL_RADIUS_CELLS = 4.5;
-const KERNEL_SIGMA = KERNEL_RADIUS_CELLS / 2;
+/** W(R) ≈ 0.135 가 되도록 σ = R/√2. 원판 안쪽이 더 고르게 짙어져 원형으로 읽힙니다. */
+const KERNEL_SIGMA = KERNEL_RADIUS_CELLS / Math.SQRT2;
 
 export type LandDotProps = {
   photoCount: number;
@@ -43,7 +44,7 @@ export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   0.4,
   5,
   0.25,
-  0.1,
+  0.045,
 ];
 
 type DotCell = {
