@@ -146,3 +146,7 @@
   background: rgb(255 255 255 / 0.72) !important;
   color: #737373 !important;
 }
+.country-mini-map .mapboxgl-ctrl,
+.country-mini-map .mapboxgl-ctrl-logo {
+  display: none !important;
+}

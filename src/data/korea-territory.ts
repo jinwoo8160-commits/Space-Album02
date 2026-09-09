@@ -133,7 +133,7 @@ const KOREA_RINGS: Ring[] = [
 ];
 
 /** 대마도·이키 등: 폴리곤이 헐거워도 이 박스는 무조건 제외. */
-function isForeignIsland(lng: number, lat: number) {
+export function isForeignIsland(lng: number, lat: number) {
   const tsushima = lat >= 34.02 && lat <= 34.82 && lng >= 129.12 && lng <= 129.55;
   const iki = lat >= 33.68 && lat <= 33.9 && lng >= 129.58 && lng <= 129.82;
   const okinoshima = lat >= 34.2 && lat <= 34.28 && lng >= 130.05 && lng <= 130.15;

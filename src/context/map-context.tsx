@@ -12,10 +12,9 @@
  * 휠/핀치는 연속으로 움직이고, 레이어 전환은 줌 9.5를 넘은 뒤 조작이 끝났을 때 1회만 합니다.
  */
 
-import { COUNTRY_BY_ID, COUNTRIES } from "@/data/country-masks";
+import { COUNTRY_BY_ID } from "@/data/country-masks";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
-import { maskToDots } from "@/lib/geo";
 import { filterPhotos } from "@/lib/filters";
 import {
   CLUSTER_ZOOM,
@@ -43,10 +42,6 @@ import {
   type RefObject,
 } from "react";
 import type { MapRef } from "react-map-gl/mapbox";
-
-export const COUNTRY_DOTS = Object.fromEntries(
-  COUNTRIES.map((country) => [country.id, maskToDots(country)]),
-) as Record<CountryId, ReturnType<typeof maskToDots>>;
 
 type MapContextValue = {
   photos: Photo[];
