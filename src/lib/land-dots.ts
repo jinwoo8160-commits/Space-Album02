@@ -12,10 +12,13 @@ import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**
  * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
- * 사진→가장 가까운 도트에 5x5 커널로 점수를 퍼뜨리고, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
+ * 사진→가장 가까운 도트에 유클리드 가우시안 커널로 점수를 퍼뜨리고, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
+/** 격자 칸 단위 영향 반지름. 체비셰프 5×5 네모를 피하고 원형으로 자릅니다. */
+const KERNEL_RADIUS_CELLS = 2.75;
+const KERNEL_SIGMA = KERNEL_RADIUS_CELLS / 2;
 
 export type LandDotProps = {
   photoCount: number;
@@ -39,10 +42,6 @@ export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
   0.25,
   0.1,
 ];
-
-const KERNEL_CENTER = 1;
-const KERNEL_RING1 = 0.5;
-const KERNEL_RING2 = 0.2;
 
 type DotCell = {
   lng: number;
@@ -137,13 +136,14 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
 
     best.photoCount += 1;
 
-    for (let dr = -2; dr <= 2; dr += 1) {
-      for (let dc = -2; dc <= 2; dc += 1) {
-        const ring = Math.max(Math.abs(dr), Math.abs(dc));
-        const weight = ring === 0 ? KERNEL_CENTER : ring === 1 ? KERNEL_RING1 : KERNEL_RING2;
+    const reach = Math.ceil(KERNEL_RADIUS_CELLS);
+    for (let dr = -reach; dr <= reach; dr += 1) {
+      for (let dc = -reach; dc <= reach; dc += 1) {
+        const d = Math.hypot(dr, dc);
+        if (d > KERNEL_RADIUS_CELLS) continue;
         const neighbor = byGrid.get(`${best.row + dr}:${best.col + dc}`);
         if (!neighbor) continue;
-        neighbor.totalScore += weight;
+        neighbor.totalScore += Math.exp(-((d / KERNEL_SIGMA) * (d / KERNEL_SIGMA)));
       }
     }
   }
