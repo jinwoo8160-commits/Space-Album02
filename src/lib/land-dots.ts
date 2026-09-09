@@ -8,16 +8,34 @@ import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
 import type { CountryId, Photo } from "@/types/album";
 import type { Feature, FeatureCollection, Point } from "geojson";
-import type { Map as MapboxMap } from "mapbox-gl";
+import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**
  * 국가는 bounding box 로 훑되, 한국은 한반도 영토 폴리곤 안에만 점을 남깁니다.
- * 줌/팬마다 다시 만들지 않습니다.
+ * 사진→가장 가까운 도트 1개, 밀도 5단계는 격자 생성 시 1회만 계산합니다.
  */
 export const DOT_RADIUS_PX = 1.85;
 const GRID_CELLS = 130;
 
-export type LandDotProps = { count: number };
+export type LandDotProps = { photoCount: number; densityLevel: number; count: number };
+
+export const DENSITY_OPACITY_EXPR: ExpressionSpecification = [
+  "match",
+  ["get", "densityLevel"],
+  1,
+  1.0,
+  2,
+  0.8,
+  3,
+  0.6,
+  4,
+  0.4,
+  5,
+  0.25,
+  0.1,
+];
+
+type DotCell = { lng: number; lat: number; photoCount: number; densityLevel: number };
 
 export function buildLandDotGrid(
   map: MapboxMap,
@@ -28,56 +46,71 @@ export function buildLandDotGrid(
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = bounds.maxLng - bounds.minLng;
   const step = Math.max(latSpan, lngSpan) / GRID_CELLS;
-  const influence = step * 6.5;
-
   const water = queryWaterPolygons(map);
 
-  const features: Feature<Point, LandDotProps>[] = [];
-  let index = 0;
+  const cells: DotCell[] = [];
 
   for (let lat = bounds.minLat + step / 2; lat < bounds.maxLat; lat += step) {
     for (let lng = bounds.minLng + step / 2; lng < bounds.maxLng; lng += step) {
       if (countryId === "kr" && !isInKoreaTerritory(lng, lat)) continue;
       if (isInWater(lng, lat, water)) continue;
-
-      features.push(makeDot(index, lng, lat, photos, influence));
-      index += 1;
+      cells.push({ lng, lat, photoCount: 0, densityLevel: 0 });
     }
   }
 
   if (countryId === "kr") {
     for (const seed of KOREA_ISLAND_SEEDS) {
-      const already = features.some(
-        (feature) =>
-          Math.abs(feature.geometry.coordinates[0]! - seed.lng) < step * 0.6 &&
-          Math.abs(feature.geometry.coordinates[1]! - seed.lat) < step * 0.6,
+      const already = cells.some(
+        (cell) => Math.abs(cell.lng - seed.lng) < step * 0.6 && Math.abs(cell.lat - seed.lat) < step * 0.6,
       );
       if (already) continue;
-      features.push(makeDot(index, seed.lng, seed.lat, photos, influence));
-      index += 1;
+      cells.push({ lng: seed.lng, lat: seed.lat, photoCount: 0, densityLevel: 0 });
     }
   }
 
-  return { type: "FeatureCollection", features };
+  assignPhotosToNearestDot(cells, photos);
+  assignDensityLevels(cells);
+
+  return {
+    type: "FeatureCollection",
+    features: cells.map((cell, index) => ({
+      type: "Feature",
+      id: index,
+      properties: {
+        photoCount: cell.photoCount,
+        densityLevel: cell.densityLevel,
+        count: cell.photoCount,
+      },
+      geometry: { type: "Point", coordinates: [cell.lng, cell.lat] },
+    })),
+  };
 }
 
-function makeDot(
-  id: number,
-  lng: number,
-  lat: number,
-  photos: Photo[],
-  influence: number,
-): Feature<Point, LandDotProps> {
-  let count = 0;
+function assignPhotosToNearestDot(cells: DotCell[], photos: Photo[]) {
+  if (cells.length === 0) return;
   for (const photo of photos) {
-    if (approxDistance({ lat, lng }, photo) <= influence) count += 1;
+    let best = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < cells.length; i += 1) {
+      const dist = approxDistance(cells[i]!, photo);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    }
+    cells[best]!.photoCount += 1;
   }
-  return {
-    type: "Feature",
-    id,
-    properties: { count },
-    geometry: { type: "Point", coordinates: [lng, lat] },
-  };
+}
+
+/** 사진이 있는 도트만 상위 20% 단위 5분위로 나눕니다. 1이 가장 짙음. */
+function assignDensityLevels(cells: DotCell[]) {
+  const occupied = cells.filter((cell) => cell.photoCount > 0);
+  occupied.sort((a, b) => b.photoCount - a.photoCount || a.lat - b.lat);
+  const n = occupied.length;
+  occupied.forEach((cell, index) => {
+    const bucket = n <= 1 ? 0 : Math.min(4, Math.floor((index / n) * 5));
+    cell.densityLevel = bucket + 1;
+  });
 }
 
 function queryWaterPolygons(map: MapboxMap): GeoJSON.Feature[] {

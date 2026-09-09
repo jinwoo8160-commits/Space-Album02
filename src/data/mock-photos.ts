@@ -1,191 +1,149 @@
-import type { Photo } from "@/types/album";
+import type { CategoryColor, Photo, PhotoScene, ProvinceId } from "@/types/album";
 
 /**
- * 1차 구현용 mock 사진 16장.
+ * 테스트용 사진 100장(한반도) + 해외 3장.
  *
- * 실제 앱에서는 갤러리/서버에서 오지만, UI·필터·줌 로직을 먼저 검증하려면
- * "날짜 / 좌표 / 색이 골고루 다른" 고정 데이터가 필요합니다.
- *
- * 배치 의도:
- * - 서울·경기를 많이 넣어 국가 도트맵에서 북서가 진하게 보이게
- * - 부산을 넣어 남동이 두 번째로 진하게 보이게 (스케치 1~2와 동일)
- * - 같은 좌표 2장 → 동 수준에서만 묶이는 케이스
- * - 미분류(null) 2장 → 컬러핀 빈 선택 / 미분류 핀 동작 확인
+ * 서울·수도권에 몰아 넣어 국가 줌에서 북서가 1단계(가장 짙음)가 되고,
+ * 부산이 그다음, 제주·강원·소도시는 1~2장씩 흩어져 4~5단계가 됩니다.
+ * 기본 연도 필터(최신 연도)에도 밀도가 보이도록 2025 장을 많이 둡니다.
  */
 
-export const MOCK_PHOTOS: Photo[] = [
+type Hub = {
+  name: string;
+  lat: number;
+  lng: number;
+  count: number;
+  jitter: number;
+  provinceId: ProvinceId;
+  locationLabel: string;
+  districtLabel: string;
+  pinExactFirst?: boolean;
+};
+
+const HUBS: Hub[] = [
+  { name: "성수", lat: 37.5447, lng: 127.0559, count: 11, jitter: 0.01, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 성동구 성수동", districtLabel: "성동구", pinExactFirst: true },
+  { name: "강남", lat: 37.4979, lng: 127.0276, count: 8, jitter: 0.011, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 강남구 역삼동", districtLabel: "강남구" },
+  { name: "홍대", lat: 37.5563, lng: 126.9236, count: 6, jitter: 0.009, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 마포구 서교동", districtLabel: "마포구" },
+  { name: "잠실", lat: 37.5133, lng: 127.1028, count: 5, jitter: 0.009, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 송파구 잠실동", districtLabel: "송파구" },
+  { name: "종로", lat: 37.5729, lng: 126.9794, count: 4, jitter: 0.008, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 종로구 종로", districtLabel: "종로구" },
+  { name: "여의도", lat: 37.5219, lng: 126.9245, count: 3, jitter: 0.007, provinceId: "seoul-gyeonggi", locationLabel: "서울특별시 영등포구 여의도동", districtLabel: "영등포구" },
+  { name: "수원", lat: 37.2636, lng: 127.0286, count: 3, jitter: 0.012, provinceId: "seoul-gyeonggi", locationLabel: "경기도 수원시 팔달구", districtLabel: "수원시" },
+  { name: "판교", lat: 37.3948, lng: 127.1112, count: 2, jitter: 0.007, provinceId: "seoul-gyeonggi", locationLabel: "경기도 성남시 분당구 판교", districtLabel: "성남시" },
+  { name: "일산", lat: 37.658, lng: 126.7682, count: 1, jitter: 0.006, provinceId: "seoul-gyeonggi", locationLabel: "경기도 고양시 일산동구", districtLabel: "고양시" },
+  { name: "해운대", lat: 35.1586, lng: 129.1604, count: 7, jitter: 0.01, provinceId: "gyeongsang", locationLabel: "부산광역시 해운대구 해운대해변로", districtLabel: "해운대구" },
+  { name: "광안리", lat: 35.1532, lng: 129.1185, count: 5, jitter: 0.008, provinceId: "gyeongsang", locationLabel: "부산광역시 수영구 광안해변로", districtLabel: "수영구" },
+  { name: "서면", lat: 35.1578, lng: 129.0592, count: 4, jitter: 0.008, provinceId: "gyeongsang", locationLabel: "부산광역시 부산진구 서면로", districtLabel: "부산진구" },
+  { name: "남포", lat: 35.0975, lng: 129.0306, count: 2, jitter: 0.007, provinceId: "gyeongsang", locationLabel: "부산광역시 중구 남포동", districtLabel: "중구" },
+  { name: "성산", lat: 33.4584, lng: 126.9425, count: 3, jitter: 0.01, provinceId: "jeju", locationLabel: "제주특별자치도 서귀포시 성산읍", districtLabel: "성산읍" },
+  { name: "제주", lat: 33.4996, lng: 126.5312, count: 3, jitter: 0.012, provinceId: "jeju", locationLabel: "제주특별자치도 제주시 이도동", districtLabel: "제주시" },
+  { name: "협재", lat: 33.3941, lng: 126.2396, count: 2, jitter: 0.008, provinceId: "jeju", locationLabel: "제주특별자치도 제주시 한림읍", districtLabel: "한림읍" },
+  { name: "서귀포", lat: 33.2541, lng: 126.56, count: 2, jitter: 0.01, provinceId: "jeju", locationLabel: "제주특별자치도 서귀포시 서귀동", districtLabel: "서귀포시" },
+  { name: "강릉", lat: 37.7519, lng: 128.8761, count: 3, jitter: 0.012, provinceId: "gangwon", locationLabel: "강원특별자치도 강릉시 경포로", districtLabel: "강릉시" },
+  { name: "속초", lat: 38.207, lng: 128.5918, count: 3, jitter: 0.01, provinceId: "gangwon", locationLabel: "강원특별자치도 속초시 동명동", districtLabel: "속초시" },
+  { name: "평창", lat: 37.3705, lng: 128.39, count: 2, jitter: 0.02, provinceId: "gangwon", locationLabel: "강원특별자치도 평창군 대관령", districtLabel: "평창군" },
+  { name: "송도", lat: 37.3897, lng: 126.642, count: 2, jitter: 0.008, provinceId: "seoul-gyeonggi", locationLabel: "인천광역시 연수구 송도동", districtLabel: "연수구" },
+  { name: "대구", lat: 35.8714, lng: 128.6014, count: 2, jitter: 0.01, provinceId: "gyeongsang", locationLabel: "대구광역시 중구 동성로", districtLabel: "중구" },
+  { name: "대전", lat: 36.3504, lng: 127.3845, count: 2, jitter: 0.01, provinceId: "chungcheong", locationLabel: "대전광역시 유성구", districtLabel: "유성구" },
+  { name: "광주", lat: 35.1595, lng: 126.8526, count: 2, jitter: 0.01, provinceId: "jeolla", locationLabel: "광주광역시 동구 충장로", districtLabel: "동구" },
+  { name: "전주", lat: 35.8242, lng: 127.148, count: 1, jitter: 0, provinceId: "jeolla", locationLabel: "전북특별자치도 전주시 한옥마을", districtLabel: "완산구" },
+  { name: "여수", lat: 34.7604, lng: 127.6622, count: 1, jitter: 0, provinceId: "jeolla", locationLabel: "전라남도 여수시 돌산읍", districtLabel: "여수시" },
+  { name: "경주", lat: 35.8562, lng: 129.2247, count: 1, jitter: 0, provinceId: "gyeongsang", locationLabel: "경상북도 경주시 황남동", districtLabel: "경주시" },
+  { name: "울산", lat: 35.5384, lng: 129.3114, count: 1, jitter: 0, provinceId: "gyeongsang", locationLabel: "울산광역시 남구 삼산동", districtLabel: "남구" },
+  { name: "포항", lat: 36.019, lng: 129.3435, count: 1, jitter: 0, provinceId: "gyeongsang", locationLabel: "경상북도 포항시 북구", districtLabel: "포항시" },
+  { name: "춘천", lat: 37.8813, lng: 127.7298, count: 1, jitter: 0, provinceId: "gangwon", locationLabel: "강원특별자치도 춘천시 근화동", districtLabel: "춘천시" },
+  { name: "천안", lat: 36.8151, lng: 127.1139, count: 1, jitter: 0, provinceId: "chungcheong", locationLabel: "충청남도 천안시 동남구", districtLabel: "천안시" },
+  { name: "안동", lat: 36.5684, lng: 128.7294, count: 1, jitter: 0, provinceId: "gyeongsang", locationLabel: "경상북도 안동시 풍천면", districtLabel: "안동시" },
+  { name: "통영", lat: 34.8544, lng: 128.4331, count: 1, jitter: 0, provinceId: "gyeongsang", locationLabel: "경상남도 통영시 중앙동", districtLabel: "통영시" },
+  { name: "목포", lat: 34.8118, lng: 126.3922, count: 1, jitter: 0, provinceId: "jeolla", locationLabel: "전라남도 목포시 해안로", districtLabel: "목포시" },
+  { name: "담양", lat: 35.3214, lng: 126.988, count: 1, jitter: 0, provinceId: "jeolla", locationLabel: "전라남도 담양군 담양읍", districtLabel: "담양군" },
+  { name: "양양", lat: 38.0754, lng: 128.619, count: 1, jitter: 0, provinceId: "gangwon", locationLabel: "강원특별자치도 양양군 손양면", districtLabel: "양양군" },
+  { name: "동해", lat: 37.5247, lng: 129.1143, count: 1, jitter: 0, provinceId: "gangwon", locationLabel: "강원특별자치도 동해시 발한동", districtLabel: "동해시" },
+];
+
+const SCENES: PhotoScene[] = [
+  "street",
+  "cafe",
+  "city-night",
+  "food",
+  "park",
+  "sunset",
+  "blossom",
+  "skyline",
+  "beach",
+  "harbor",
+  "mountain",
+  "fire",
+  "snow",
+  "temple",
+  "river",
+];
+
+const SCENE_TITLE: Record<PhotoScene, string> = {
+  street: "골목",
+  cafe: "카페",
+  "city-night": "야경",
+  food: "식사",
+  park: "공원",
+  sunset: "노을",
+  blossom: "꽃",
+  skyline: "스카이라인",
+  beach: "바다",
+  harbor: "항구",
+  mountain: "산",
+  fire: "불빛",
+  snow: "눈",
+  temple: "사찰",
+  river: "강",
+};
+
+const CATEGORIES: CategoryColor[] = ["pink", "green", "cyan", "red", null];
+
+function unit(seed: number) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function buildKoreaPhotos(): Photo[] {
+  const photos: Photo[] = [];
+  let index = 0;
+
+  HUBS.forEach((hub, hubIndex) => {
+    for (let i = 0; i < hub.count; i += 1) {
+      index += 1;
+      const scene = SCENES[(index + hubIndex) % SCENES.length]!;
+      const category = CATEGORIES[(index + hubIndex * 3) % CATEGORIES.length]!;
+      const exact = Boolean(hub.pinExactFirst && i < 2);
+      const latJ = exact ? 0 : (unit(index * 3.1) - 0.5) * 2 * hub.jitter;
+      const lngJ = exact ? 0 : (unit(index * 7.7) - 0.5) * 2 * hub.jitter;
+      const year = index % 10 < 7 ? 2025 : index % 10 < 9 ? 2024 : 2023;
+      const month = 1 + Math.floor(unit(index * 1.7) * 12);
+      const day = 1 + Math.floor(unit(index * 4.3) * 27);
+      const hour = 8 + Math.floor(unit(index * 9.1) * 14);
+
+      photos.push({
+        id: `p${String(index).padStart(3, "0")}`,
+        title: `${hub.name} ${SCENE_TITLE[scene]}`,
+        takenAt: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:10:00`,
+        lat: hub.lat + latJ,
+        lng: hub.lng + lngJ,
+        countryId: "kr",
+        provinceId: hub.provinceId,
+        locationLabel: hub.locationLabel,
+        districtLabel: hub.districtLabel,
+        category,
+        scene,
+      });
+    }
+  });
+
+  return photos;
+}
+
+const KOREA_PHOTOS = buildKoreaPhotos();
+
+const OVERSEAS: Photo[] = [
   {
-    id: "p01",
-    title: "성수동 캠프파이어",
-    takenAt: "2025-09-04T21:10:00",
-    lat: 37.5447,
-    lng: 127.0559,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 성동구 왕십리로 83",
-    districtLabel: "성동구",
-    category: "pink",
-    scene: "fire",
-  },
-  {
-    id: "p02",
-    title: "성수동 골목 야경",
-    takenAt: "2025-09-04T22:40:00",
-    // 동일 좌표: 동 수준에서만 한 묶음이 됩니다.
-    lat: 37.5447,
-    lng: 127.0559,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 성동구 왕십리로 83",
-    districtLabel: "성동구",
-    category: "pink",
-    scene: "street",
-  },
-  {
-    id: "p03",
-    title: "무학로 퇴근길",
-    takenAt: "2025-08-18T19:05:00",
-    lat: 37.5631,
-    lng: 127.0368,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 중구 무학로 15",
-    districtLabel: "중구",
-    category: "cyan",
-    scene: "city-night",
-  },
-  {
-    id: "p04",
-    title: "한강 노을",
-    takenAt: "2025-07-21T18:50:00",
-    lat: 37.5285,
-    lng: 126.934,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 마포구 한강나루로",
-    districtLabel: "마포구",
-    category: "green",
-    scene: "sunset",
-  },
-  {
-    id: "p05",
-    title: "강북구 카페",
-    takenAt: "2025-03-02T14:20:00",
-    lat: 37.6396,
-    lng: 127.0257,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 강북구 도봉로 89",
-    districtLabel: "강북구",
-    category: null,
-    scene: "cafe",
-  },
-  {
-    id: "p06",
-    title: "동대문 새벽",
-    takenAt: "2024-12-24T23:55:00",
-    lat: 37.5714,
-    lng: 127.0096,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 동대문구 왕산로",
-    districtLabel: "동대문구",
-    category: "red",
-    scene: "city-night",
-  },
-  {
-    id: "p07",
-    title: "남산 봄꽃",
-    takenAt: "2025-04-12T11:10:00",
-    lat: 37.5512,
-    lng: 126.9882,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 용산구 남산공원길",
-    districtLabel: "용산구",
-    category: "green",
-    scene: "blossom",
-  },
-  {
-    id: "p08",
-    title: "성동구 공원",
-    takenAt: "2025-06-08T16:00:00",
-    lat: 37.5502,
-    lng: 127.0401,
-    countryId: "kr",
-    provinceId: "seoul-gyeonggi",
-    locationLabel: "서울특별시 성동구 금호로",
-    districtLabel: "성동구",
-    category: "cyan",
-    scene: "park",
-  },
-  {
-    id: "p09",
-    title: "해운대 아침",
-    takenAt: "2025-06-15T07:30:00",
-    lat: 35.1586,
-    lng: 129.1604,
-    countryId: "kr",
-    provinceId: "gyeongsang",
-    locationLabel: "부산광역시 해운대구 해운대해변로",
-    districtLabel: "해운대구",
-    category: "pink",
-    scene: "beach",
-  },
-  {
-    id: "p10",
-    title: "광안대교",
-    takenAt: "2024-08-02T20:15:00",
-    lat: 35.1532,
-    lng: 129.1185,
-    countryId: "kr",
-    provinceId: "gyeongsang",
-    locationLabel: "부산광역시 수영구 광안해변로",
-    districtLabel: "수영구",
-    category: "cyan",
-    scene: "harbor",
-  },
-  {
-    id: "p11",
-    title: "서면 골목 음식",
-    takenAt: "2025-06-16T19:40:00",
-    lat: 35.1578,
-    lng: 129.0592,
-    countryId: "kr",
-    provinceId: "gyeongsang",
-    locationLabel: "부산광역시 부산진구 서면로",
-    districtLabel: "부산진구",
-    category: "red",
-    scene: "food",
-  },
-  {
-    id: "p12",
-    title: "성산 일출",
-    takenAt: "2023-05-05T05:42:00",
-    lat: 33.4584,
-    lng: 126.9425,
-    countryId: "kr",
-    provinceId: "jeju",
-    locationLabel: "제주특별자치도 서귀포시 성산읍",
-    districtLabel: "성산읍",
-    category: "red",
-    scene: "mountain",
-  },
-  {
-    id: "p13",
-    title: "협재 바다",
-    takenAt: "2023-05-07T13:20:00",
-    lat: 33.3941,
-    lng: 126.2396,
-    countryId: "kr",
-    provinceId: "jeju",
-    locationLabel: "제주특별자치도 제주시 한림읍",
-    districtLabel: "한림읍",
-    category: null,
-    scene: "beach",
-  },
-  {
-    id: "p14",
+    id: "p101",
     title: "도쿄 저녁",
     takenAt: "2024-04-02T18:10:00",
     lat: 35.6762,
@@ -198,7 +156,7 @@ export const MOCK_PHOTOS: Photo[] = [
     scene: "skyline",
   },
   {
-    id: "p15",
+    id: "p102",
     title: "뉴욕 첫눈",
     takenAt: "2024-11-11T09:05:00",
     lat: 40.758,
@@ -211,7 +169,7 @@ export const MOCK_PHOTOS: Photo[] = [
     scene: "snow",
   },
   {
-    id: "p16",
+    id: "p103",
     title: "베이징 사원",
     takenAt: "2023-10-01T09:30:00",
     lat: 39.882,
@@ -219,13 +177,14 @@ export const MOCK_PHOTOS: Photo[] = [
     countryId: "cn",
     provinceId: "other",
     locationLabel: "北京市 东城区",
-    districtLabel: "东城",
+    districtLabel: "동청",
     category: "red",
     scene: "temple",
   },
 ];
 
-/** 타임피커 기본 연도: "가장 최근 사진이 찍힌 연도" */
+export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS];
+
 export function latestPhotoYear(photos: Photo[] = MOCK_PHOTOS): number {
   return photos.reduce((max, photo) => {
     const year = new Date(photo.takenAt).getFullYear();

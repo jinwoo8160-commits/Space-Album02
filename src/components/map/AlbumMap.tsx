@@ -6,7 +6,7 @@ import { PhotoClusterMarker } from "@/components/map/PhotoClusterMarker";
 import { PhotoPin } from "@/components/map/PhotoPin";
 import { useMap } from "@/context/map-context";
 import { clusterPhotos } from "@/lib/clustering";
-import { buildLandDotGrid, DOT_RADIUS_PX } from "@/lib/land-dots";
+import { buildLandDotGrid, DENSITY_OPACITY_EXPR, DOT_RADIUS_PX } from "@/lib/land-dots";
 import { applyMapStage } from "@/lib/map-stage";
 import { DOT_MAP_STYLE, LAND_GRID_LAYER, LAND_GRID_SOURCE, MAPBOX_TOKEN } from "@/lib/map-style";
 import { DEFAULT_MAP_ZOOM, DOT_MAX_ZOOM, type MapStage } from "@/lib/zoom";
@@ -41,21 +41,11 @@ function ensureDotLayer(map: mapboxgl.Map) {
         "circle-radius": DOT_RADIUS_PX,
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
-        "circle-opacity": [
-          "interpolate",
-          ["linear"],
-          ["coalesce", ["get", "count"], 0],
-          0,
-          0.16,
-          1,
-          0.42,
-          3,
-          0.72,
-          7,
-          1,
-        ],
+        "circle-opacity": DENSITY_OPACITY_EXPR,
       },
     });
+  } else {
+    map.setPaintProperty(LAND_GRID_LAYER, "circle-opacity", DENSITY_OPACITY_EXPR);
   }
 }
 
@@ -92,7 +82,7 @@ export function AlbumMap() {
       if (!map?.isStyleLoaded()) return;
       if (!map.areTilesLoaded()) return;
 
-      const key = `peninsula-v1:${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
+      const key = `density-v1:${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
       if (!force && gridKeyRef.current === key) return;
 
       ensureDotLayer(map);
