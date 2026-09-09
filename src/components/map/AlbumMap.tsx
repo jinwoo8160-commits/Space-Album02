@@ -14,9 +14,9 @@ import {
   DOT_FADE_START,
   pinLayerOpacity,
 } from "@/lib/zoom";
-import type { CircleLayerSpecification } from "mapbox-gl";
-import { useMemo } from "react";
-import Map, { Layer, Marker, Source } from "react-map-gl/mapbox";
+import type { CircleLayerSpecification, GeoJSONSource } from "mapbox-gl";
+import { useEffect, useMemo } from "react";
+import Map, { Marker } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 /**
@@ -37,7 +37,7 @@ const DOT_LAYER: Omit<CircleLayerSpecification, "source"> = {
   type: "circle",
   maxzoom: DOT_FADE_END + 0.15,
   paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 2.2, 5, 3.6],
+    "circle-radius": 3.2,
     "circle-blur": 0,
     "circle-color": "#ffffff",
     // 밀도(count) × 줌 디졸브. 식은 * 한 겹만 써서 레이어가 조용히 빠지지 않게 합니다.
@@ -80,6 +80,41 @@ export function AlbumMap() {
     [filteredPhotos, mapZoom, pinOpacity],
   );
 
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return undefined;
+
+    const syncDots = () => {
+      if (!map.isStyleLoaded()) return;
+      try {
+        const existing = map.getSource("photo-density") as GeoJSONSource | undefined;
+        if (existing) {
+          existing.setData(density);
+          if (!map.getLayer("photo-dots")) {
+            map.addLayer({
+              ...DOT_LAYER,
+              source: "photo-density",
+            } as CircleLayerSpecification);
+          }
+          return;
+        }
+        map.addSource("photo-density", { type: "geojson", data: density });
+        map.addLayer({
+          ...DOT_LAYER,
+          source: "photo-density",
+        } as CircleLayerSpecification);
+      } catch {
+        /* 스타일 교체 중이면 onLoad 에서 다시 붙습니다. */
+      }
+    };
+
+    if (map.isStyleLoaded()) syncDots();
+    else map.once("load", syncDots);
+    return () => {
+      map.off("load", syncDots);
+    };
+  }, [density, mapRef]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#111] px-6 text-center text-sm text-neutral-400">
@@ -113,6 +148,14 @@ export function AlbumMap() {
           maxZoom: 5.4,
           duration: 0,
         });
+        const map = event.target;
+        if (!map.getSource("photo-density")) {
+          map.addSource("photo-density", { type: "geojson", data: density });
+          map.addLayer({
+            ...DOT_LAYER,
+            source: "photo-density",
+          } as CircleLayerSpecification);
+        }
       }}
       onMove={(event) => setMapZoom(event.viewState.zoom)}
       onClick={(event) => {
@@ -134,10 +177,6 @@ export function AlbumMap() {
       }}
       style={{ width: "100%", height: "100%" }}
     >
-      <Source id="photo-density" type="geojson" data={density}>
-        <Layer {...DOT_LAYER} />
-      </Source>
-
       {cityClusters.map((cluster) => (
         <Marker
           key={`c-${cluster.id}`}
