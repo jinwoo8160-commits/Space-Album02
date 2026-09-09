@@ -92,7 +92,7 @@ export function AlbumMap() {
       if (!map?.isStyleLoaded()) return;
       if (!map.areTilesLoaded()) return;
 
-      const key = `${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
+      const key = `peninsula-v1:${countryRef.current}:${photosRef.current.map((photo) => photo.id).join(",")}`;
       if (!force && gridKeyRef.current === key) return;
 
       ensureDotLayer(map);
