@@ -13,8 +13,10 @@ import { DOT_MAP_STYLE, LAND_GRID_LAYER, LAND_GRID_SOURCE, MAPBOX_TOKEN } from "
 import {
   DEFAULT_MAP_ZOOM,
   DOT_MAX_ZOOM,
+  isKoreaMinZoom,
   KOREA_HOME_CENTER,
   KOREA_MAX_BOUNDS,
+  magnetCenterTowardKorea,
   MIN_MAP_ZOOM,
   SNAP_START_ZOOM,
   type MapStage,
@@ -121,46 +123,114 @@ export function AlbumMap() {
     [mapRef],
   );
 
-  const snapLock = useRef(false);
+  const applyingCamera = useRef(false);
+  const zoomGesture = useRef(false);
+
+  const syncMinZoomPan = useCallback((map: mapboxgl.Map) => {
+    if (isKoreaMinZoom(map.getZoom())) {
+      if (map.dragPan.isEnabled()) map.dragPan.disable();
+    } else if (!map.dragPan.isEnabled()) {
+      map.dragPan.enable();
+    }
+  }, []);
 
   const pullTowardKoreaHome = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (!map || snapLock.current) return;
-    if (countryRef.current !== "kr") return;
+    if (!map || applyingCamera.current) return;
     const zoom = map.getZoom();
+    syncMinZoomPan(map);
     if (zoom >= SNAP_START_ZOOM) return;
-    const t = (SNAP_START_ZOOM - zoom) / (SNAP_START_ZOOM - MIN_MAP_ZOOM);
-    const pull = Math.min(1, Math.max(0, t)) ** 2;
-    const center = map.getCenter();
-    map.setCenter([
-      center.lng + (KOREA_HOME_CENTER[0] - center.lng) * pull,
-      center.lat + (KOREA_HOME_CENTER[1] - center.lat) * pull,
-    ]);
-  }, [mapRef]);
 
-  const lockKoreaHome = useCallback(() => {
+    if (zoom <= MIN_MAP_ZOOM + 0.02) {
+      const center = map.getCenter();
+      if (
+        Math.abs(center.lng - KOREA_HOME_CENTER[0]) < 0.001 &&
+        Math.abs(center.lat - KOREA_HOME_CENTER[1]) < 0.001 &&
+        Math.abs(zoom - MIN_MAP_ZOOM) < 0.01
+      ) {
+        return;
+      }
+      applyingCamera.current = true;
+      map.jumpTo({ center: KOREA_HOME_CENTER, zoom: MIN_MAP_ZOOM });
+      applyingCamera.current = false;
+      return;
+    }
+
+    const center = map.getCenter();
+    const next = magnetCenterTowardKorea(center.lng, center.lat, zoom);
+    if (Math.abs(next[0] - center.lng) < 0.0004 && Math.abs(next[1] - center.lat) < 0.0004) {
+      return;
+    }
+    applyingCamera.current = true;
+    map.setCenter(next);
+    applyingCamera.current = false;
+  }, [mapRef, syncMinZoomPan]);
+
+  const lockIfMinZoom = useCallback(() => {
     const map = mapRef.current?.getMap();
-    if (!map || snapLock.current) return;
-    if (countryRef.current !== "kr") return;
-    if (map.getZoom() > MIN_MAP_ZOOM + 0.05) return;
+    if (!map || applyingCamera.current) return;
+    if (!isKoreaMinZoom(map.getZoom())) return;
     const center = map.getCenter();
     if (
-      Math.abs(center.lng - KOREA_HOME_CENTER[0]) < 0.01 &&
-      Math.abs(center.lat - KOREA_HOME_CENTER[1]) < 0.01
+      Math.abs(center.lng - KOREA_HOME_CENTER[0]) < 0.001 &&
+      Math.abs(center.lat - KOREA_HOME_CENTER[1]) < 0.001
     ) {
       return;
     }
-    snapLock.current = true;
+    applyingCamera.current = true;
+    map.jumpTo({ center: KOREA_HOME_CENTER, zoom: MIN_MAP_ZOOM });
+    applyingCamera.current = false;
+  }, [mapRef]);
+
+  const settleKoreaCamera = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || applyingCamera.current) return;
+    const zoom = map.getZoom();
+    syncMinZoomPan(map);
+    if (zoom >= SNAP_START_ZOOM) return;
+
+    const center = map.getCenter();
+    const lock = isKoreaMinZoom(zoom);
+    const dest = lock ? KOREA_HOME_CENTER : magnetCenterTowardKorea(center.lng, center.lat, zoom);
+    const destZoom = lock ? MIN_MAP_ZOOM : Math.max(zoom, MIN_MAP_ZOOM);
+    if (
+      Math.abs(center.lng - dest[0]) < 0.008 &&
+      Math.abs(center.lat - dest[1]) < 0.008 &&
+      Math.abs(zoom - destZoom) < 0.04
+    ) {
+      return;
+    }
+
+    applyingCamera.current = true;
     map.easeTo({
-      center: KOREA_HOME_CENTER,
-      zoom: MIN_MAP_ZOOM,
-      duration: 380,
+      center: dest,
+      zoom: destZoom,
+      duration: lock ? 360 : 280,
       essential: true,
     });
     map.once("idle", () => {
-      snapLock.current = false;
+      applyingCamera.current = false;
     });
-  }, [mapRef]);
+  }, [mapRef, syncMinZoomPan]);
+
+  const onZoomStart = useCallback(() => {
+    zoomGesture.current = true;
+  }, []);
+
+  const onZoomEndSnap = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (map && isKoreaMinZoom(map.getZoom())) {
+      settleKoreaCamera();
+    }
+  }, [mapRef, settleKoreaCamera]);
+
+  const onMoveEndSnap = useCallback(() => {
+    if (zoomGesture.current) {
+      zoomGesture.current = false;
+      return;
+    }
+    settleKoreaCamera();
+  }, [settleKoreaCamera]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -190,34 +260,38 @@ export function AlbumMap() {
 
     map.on("zoomend", onSettled);
     map.on("sourcedata", onSourceData);
+    map.on("zoomstart", onZoomStart);
     map.on("zoom", pullTowardKoreaHome);
-    map.on("zoomend", lockKoreaHome);
+    map.on("move", lockIfMinZoom);
+    map.on("zoomend", onZoomEndSnap);
+    map.on("moveend", onMoveEndSnap);
+    map.setMinZoom(MIN_MAP_ZOOM);
+    map.setMaxBounds(KOREA_MAX_BOUNDS);
+    syncMinZoomPan(map);
     onSettled();
 
     return () => {
       map.off("zoomend", onSettled);
       map.off("sourcedata", onSourceData);
+      map.off("zoomstart", onZoomStart);
       map.off("zoom", pullTowardKoreaHome);
-      map.off("zoomend", lockKoreaHome);
+      map.off("move", lockIfMinZoom);
+      map.off("zoomend", onZoomEndSnap);
+      map.off("moveend", onMoveEndSnap);
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
     };
-  }, [mapReady, mapRef, rebuildLandGrid, setMapZoom, pullTowardKoreaHome, lockKoreaHome]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    if (selectedCountryId === "kr") {
-      map.setMinZoom(MIN_MAP_ZOOM);
-      map.setMaxBounds(KOREA_MAX_BOUNDS);
-    } else {
-      map.setMinZoom(1.4);
-      map.setMaxBounds([
-        [-179, -75],
-        [179, 75],
-      ]);
-    }
-  }, [mapReady, mapRef, selectedCountryId]);
+  }, [
+    mapReady,
+    mapRef,
+    rebuildLandGrid,
+    setMapZoom,
+    pullTowardKoreaHome,
+    lockIfMinZoom,
+    onZoomStart,
+    onZoomEndSnap,
+    onMoveEndSnap,
+    syncMinZoomPan,
+  ]);
 
   useEffect(() => {
     gridKeyRef.current = "";
@@ -250,9 +324,9 @@ export function AlbumMap() {
           latitude: KOREA_HOME_CENTER[1],
           zoom: DEFAULT_MAP_ZOOM,
         }}
-        minZoom={selectedCountryId === "kr" ? MIN_MAP_ZOOM : 1.4}
+        minZoom={MIN_MAP_ZOOM}
         maxZoom={17.5}
-        maxBounds={selectedCountryId === "kr" ? KOREA_MAX_BOUNDS : undefined}
+        maxBounds={KOREA_MAX_BOUNDS}
         attributionControl={false}
         logoPosition="bottom-right"
         dragRotate={false}

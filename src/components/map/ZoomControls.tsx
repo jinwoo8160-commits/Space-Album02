@@ -5,9 +5,8 @@ import { MIN_MAP_ZOOM } from "@/lib/zoom";
 import { Minus, Plus } from "lucide-react";
 
 export function ZoomControls() {
-  const { mapRef, mapZoom, selectedCountryId } = useMap();
-  const minZoom = selectedCountryId === "kr" ? MIN_MAP_ZOOM : 1.4;
-  const atMin = mapZoom <= minZoom + 0.04;
+  const { mapRef, mapZoom } = useMap();
+  const atMin = mapZoom <= MIN_MAP_ZOOM + 0.04;
 
   return (
     <div className="absolute top-1/2 left-5 z-20 flex -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white/92 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
