@@ -1,11 +1,15 @@
 "use client";
 
-import { categoryBorderColor, ScenicPhoto } from "@/components/map/ScenicPhoto";
+import { ScenicPhoto } from "@/components/map/ScenicPhoto";
+import { hexByCategoryList, hexForCategory } from "@/lib/constants";
+import { useMap } from "@/context/map-context";
 import type { Photo } from "@/types/album";
+import { useMemo } from "react";
 
-/** TODO: [디자인] 첨부 이미지 스타일 반영 위치 — 동 수준 개별 사진 핀 (손그림 테두리) */
 export function PhotoPin({ photo, onClick }: { photo: Photo; onClick: () => void }) {
-  const border = categoryBorderColor(photo.category);
+  const { keyCategories } = useMap();
+  const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
+  const border = hexForCategory(photo.category, hexById);
 
   return (
     <button

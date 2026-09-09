@@ -1,12 +1,11 @@
 "use client";
 
-import { categoryBorderColor, ScenicPhoto } from "@/components/map/ScenicPhoto";
+import { ScenicPhoto } from "@/components/map/ScenicPhoto";
+import { hexByCategoryList, hexForCategory } from "@/lib/constants";
+import { useMap } from "@/context/map-context";
 import type { PhotoCluster } from "@/types/album";
+import { useMemo } from "react";
 
-/**
- * TODO: [디자인] 첨부 이미지 스타일 반영 위치
- * 스케치 3~4의 손그림 테두리 폴라로이드 스택 + 손글씨 숫자 배지
- */
 export function PhotoClusterMarker({
   cluster,
   onClick,
@@ -14,8 +13,10 @@ export function PhotoClusterMarker({
   cluster: PhotoCluster;
   onClick: () => void;
 }) {
+  const { keyCategories } = useMap();
+  const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
   const top = cluster.photos.slice(0, 3);
-  const border = categoryBorderColor(top[0]?.category ?? null);
+  const border = hexForCategory(top[0]?.category ?? null, hexById);
 
   return (
     <button type="button" onClick={onClick} className="flex flex-col items-center">

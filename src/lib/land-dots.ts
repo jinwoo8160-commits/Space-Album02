@@ -7,7 +7,7 @@ import {
 import { hexForFilterKey, UNCLASSIFIED_HEX } from "@/lib/constants";
 import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
-import type { CategoryFilterKey, CountryId, Photo } from "@/types/album";
+import type { CountryId, Photo } from "@/types/album";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
@@ -71,6 +71,7 @@ export function buildLandDotGrid(
   photos: Photo[],
   countryId: CountryId,
   colorize = false,
+  hexById: Record<string, string> = {},
 ): FeatureCollection<Point, LandDotProps> {
   const bounds = countryId === "kr" ? KOREA_GRID_BOUNDS : COUNTRY_BY_ID[countryId].bounds;
   const latSpan = bounds.maxLat - bounds.minLat;
@@ -119,7 +120,7 @@ export function buildLandDotGrid(
 
   spreadPhotoKernels(cells, byGrid, photos);
   assignDensityLevels(cells);
-  assignDotColors(cells, colorize);
+  assignDotColors(cells, colorize, hexById);
 
   return {
     type: "FeatureCollection",
@@ -183,24 +184,24 @@ function assignDensityLevels(cells: DotCell[]) {
   });
 }
 
-function assignDotColors(cells: DotCell[], colorize: boolean) {
+function assignDotColors(cells: DotCell[], colorize: boolean, hexById: Record<string, string>) {
   for (const cell of cells) {
     if (!colorize || cell.totalScore <= 0) {
       cell.color = UNCLASSIFIED_HEX;
       continue;
     }
-    cell.color = blendCategoryColors(cell.scoreByCategory);
+    cell.color = blendCategoryColors(cell.scoreByCategory, hexById);
   }
 }
 
-function blendCategoryColors(scores: Map<string, number>): string {
+function blendCategoryColors(scores: Map<string, number>, hexById: Record<string, string>): string {
   let r = 0;
   let g = 0;
   let b = 0;
   let weight = 0;
   scores.forEach((score, key) => {
     if (score <= 0) return;
-        const [cr, cg, cb] = parseHex(hexForFilterKey(key as CategoryFilterKey));
+    const [cr, cg, cb] = parseHex(hexForFilterKey(key, hexById));
     r += cr * score;
     g += cg * score;
     b += cb * score;

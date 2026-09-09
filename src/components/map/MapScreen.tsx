@@ -6,12 +6,12 @@ import { CountrySelectButton } from "@/components/map/CountrySelectButton";
 import { CountrySelectModal } from "@/components/map/CountrySelectModal";
 import { PhotoDetailModal } from "@/components/map/PhotoDetailModal";
 import { TimePicker } from "@/components/map/TimePicker";
+import { ZoomControls } from "@/components/map/ZoomControls";
 import { useMap } from "@/context/map-context";
 import { OVERLAY_LABEL } from "@/lib/zoom";
 
 /**
- * 줌은 Mapbox GL 의 휠·트랙패드·핀치가 담당합니다.
- * +/- 로 1단계씩 건너뛰면 연속 줌이 아니므로 버튼을 두지 않습니다.
+ * 줌은 Mapbox 휠·핀치와 왼쪽 +/- 버튼이 함께 담당합니다.
  */
 export function MapScreen() {
   const { overlayMode, mapZoom, filteredPhotos } = useMap();
@@ -41,6 +41,8 @@ export function MapScreen() {
       <div className="absolute top-16 right-3 z-20">
         <ColorPinFilter />
       </div>
+
+      <ZoomControls />
 
       <div className="absolute inset-x-0 bottom-[4.35rem] z-20">
         <TimePicker />

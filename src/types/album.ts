@@ -6,15 +6,20 @@
  * - 타입이 흩어지면 "사진은 어디에 category가 있지?"를 매번 찾게 됩니다.
  */
 
-/** 사용자가 지정할 수 있는 카테고리 색. null 은 "아직 분류하지 않음". */
-export type CategoryColor = "pink" | "green" | "cyan" | "red" | null;
+/** 사용자가 지정할 수 있는 카테고리. null 은 "아직 분류하지 않음". 커스텀 id 도 허용합니다. */
+export type CategoryColor = string | null;
+
+export type KeyCategory = {
+  id: string;
+  name: string;
+  hex: string;
+};
 
 /**
  * 필터 UI 에서는 null 을 그대로 Set 에 넣기 어렵습니다.
  * (Set 은 값이지만, "미분류 핀"을 토글하는 키로는 문자열이 더 안전합니다.)
- * 그래서 필터 전용 키를 따로 둡니다.
  */
-export type CategoryFilterKey = "pink" | "green" | "cyan" | "red" | "unclassified";
+export type CategoryFilterKey = string;
 
 /**
  * 줌에 따라 올라가는 레이어 종류.

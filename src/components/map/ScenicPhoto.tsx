@@ -1,6 +1,6 @@
 "use client";
 
-import { CATEGORY_HEX, UNCLASSIFIED_HEX } from "@/lib/constants";
+import { CATEGORY_HEX, hexForCategory } from "@/lib/constants";
 import type { CategoryColor, PhotoScene } from "@/types/album";
 
 /**
@@ -237,7 +237,6 @@ function SkylineScene() {
   );
 }
 
-export function categoryBorderColor(category: CategoryColor): string {
-  if (!category) return UNCLASSIFIED_HEX;
-  return CATEGORY_HEX[category];
+export function categoryBorderColor(category: CategoryColor, hexById: Record<string, string> = CATEGORY_HEX): string {
+  return hexForCategory(category, hexById);
 }

@@ -13,6 +13,7 @@
  */
 
 import { COUNTRY_BY_ID } from "@/data/country-masks";
+import { BUILTIN_KEY_CATEGORIES } from "@/lib/categories";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
 import { filterPhotos } from "@/lib/filters";
@@ -27,6 +28,7 @@ import type {
   CategoryColor,
   CategoryFilterKey,
   CountryId,
+  KeyCategory,
   OverlayMode,
   Photo,
   TimeFilter,
@@ -56,6 +58,9 @@ type MapContextValue = {
   flyToPins: (lat: number, lng: number) => void;
   selectedCategories: Set<CategoryFilterKey>;
   toggleCategory: (key: CategoryFilterKey) => void;
+  keyCategories: KeyCategory[];
+  addKeyCategory: (name: string, hex: string) => KeyCategory;
+  removeKeyCategory: (id: string) => void;
   timeFilter: TimeFilter;
   setTimeFilter: (next: TimeFilter) => void;
   selectedPhotoId: string | null;
@@ -74,6 +79,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [photos, setPhotos] = useState<Photo[]>(MOCK_PHOTOS);
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>("kr");
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
+  const [keyCategories, setKeyCategories] = useState<KeyCategory[]>(BUILTIN_KEY_CATEGORIES);
   const [selectedCategories, setSelectedCategories] = useState<Set<CategoryFilterKey>>(
     () => new Set(),
   );
@@ -104,6 +110,28 @@ export function MapProvider({ children }: { children: ReactNode }) {
       else next.add(key);
       return next;
     });
+  }, []);
+
+  const addKeyCategory = useCallback((name: string, hex: string): KeyCategory => {
+    const created: KeyCategory = {
+      id: `cat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      name: name.trim() || "새 카테고리",
+      hex,
+    };
+    setKeyCategories((prev) => [...prev, created]);
+    return created;
+  }, []);
+
+  const removeKeyCategory = useCallback((id: string) => {
+    setKeyCategories((prev) => prev.filter((item) => item.id !== id));
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setPhotos((prev) =>
+      prev.map((photo) => (photo.category === id ? { ...photo, category: null } : photo)),
+    );
   }, []);
 
   const setPhotoCategory = useCallback((photoId: string, category: CategoryColor) => {
@@ -164,6 +192,9 @@ export function MapProvider({ children }: { children: ReactNode }) {
     flyToPins,
     selectedCategories,
     toggleCategory,
+    keyCategories,
+    addKeyCategory,
+    removeKeyCategory,
     timeFilter,
     setTimeFilter,
     selectedPhotoId,

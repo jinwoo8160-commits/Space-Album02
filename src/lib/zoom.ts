@@ -14,6 +14,14 @@ export const CLUSTER_MAX_ZOOM = 12;
 export const DOT_ZOOM_THRESHOLD = DOT_MAX_ZOOM;
 
 export const DEFAULT_MAP_ZOOM = 5.4;
+export const MIN_MAP_ZOOM = 5.4;
+/** 줌 5.4 에서 남한 영토가 화면 중앙에 오도록 맞춘 좌표. */
+export const KOREA_HOME_CENTER: [number, number] = [127.8, 35.8];
+export const SNAP_START_ZOOM = 6.0;
+export const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [122.4, 30.1],
+  [133.2, 41.5],
+];
 
 export type MapStage = "dots" | "detail";
 
