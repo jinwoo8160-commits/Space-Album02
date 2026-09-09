@@ -11,10 +11,10 @@ import type { OverlayMode } from "@/types/album";
  *  | 6 ~ 11        | 시·도 / 구·군 | 도트 디졸브 아웃 + 묶음 핀 디졸브 인
  *  | 12 이상       | 동 / 거리      | 개별 사진 핀
  */
-export const DOT_FADE_START = 5.2;
-export const DOT_FADE_END = 6.4;
-export const CLUSTER_FADE_IN_START = 5.5;
-export const CLUSTER_FADE_IN_END = 6.6;
+export const DOT_FADE_START = 5.6;
+export const DOT_FADE_END = 6.55;
+export const CLUSTER_FADE_IN_START = 6.0;
+export const CLUSTER_FADE_IN_END = 6.85;
 export const CLUSTER_FADE_OUT_START = 11.0;
 export const CLUSTER_FADE_OUT_END = 12.05;
 export const PIN_FADE_IN_START = 11.15;

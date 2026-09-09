@@ -37,20 +37,14 @@ const DOT_LAYER: Omit<CircleLayerSpecification, "source"> = {
   type: "circle",
   maxzoom: DOT_FADE_END + 0.15,
   paint: {
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 2.0, 5, 3.2],
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 2.2, 5, 3.6],
     "circle-blur": 0,
-    // Dark 스타일 위에서는 밝은 점이 보여야 합니다.
-    "circle-color": "#f2f2f2",
+    "circle-color": "#ffffff",
+    // 밀도(count) × 줌 디졸브. 식은 * 한 겹만 써서 레이어가 조용히 빠지지 않게 합니다.
     "circle-opacity": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      0,
-      ["interpolate", ["linear"], ["get", "count"], 1, 0.32, 2, 0.5, 4, 0.72, 8, 0.92],
-      DOT_FADE_START,
-      ["interpolate", ["linear"], ["get", "count"], 1, 0.32, 2, 0.5, 4, 0.72, 8, 0.92],
-      DOT_FADE_END,
-      0,
+      "*",
+      ["interpolate", ["linear"], ["get", "count"], 1, 0.45, 2, 0.62, 4, 0.8, 8, 0.95],
+      ["interpolate", ["linear"], ["zoom"], 5.6, 1, 6.55, 0],
     ],
     "circle-stroke-width": 0,
     "circle-pitch-alignment": "viewport",
