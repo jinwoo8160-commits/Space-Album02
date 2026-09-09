@@ -8,7 +8,7 @@ export const AlbumMapDynamic = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full w-full items-center justify-center bg-[#111] text-sm text-neutral-400">
+      <div className="flex h-full w-full items-center justify-center bg-white text-sm text-neutral-500">
         지도를 불러오는 중…
       </div>
     ),

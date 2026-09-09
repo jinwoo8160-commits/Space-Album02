@@ -1,14 +1,42 @@
 /**
- * Mapbox GL JS 초기화에 쓰는 값.
+ * 흰 캔버스 + Mapbox streets 수역 타일만 로드합니다.
+ * 도로·라벨·지형·위성은 그리지 않습니다.
+ * 해안선은 수역 폴리곤의 반대(육지)에 도트 격자를 심어 드러냅니다.
  *
- * 토큰은 코드에 하드코딩하지 않습니다.
- * Next.js 는 NEXT_PUBLIC_ 변수를 번들에 넣으므로 .env.local 에만 둡니다.
- * (저장소에는 .env.example 만 커밋)
+ * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — background-color
  */
+import type { StyleSpecification } from "mapbox-gl";
+
 export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-/**
- * Dark/Monochrome — 해안선·행정 경계가 또렷한 공식 미니멀 스타일.
- * TODO: [디자인] 첨부 이미지 스타일 반영 위치 — Studio 커스텀 스타일로 바꿀 때 여기만 교체
- */
-export const MAPBOX_STYLE = "mapbox://styles/mapbox/dark-v11";
+export const MAPBOX_STREETS_SOURCE = "mapbox-streets";
+export const WATER_QUERY_LAYER = "water-query";
+
+export const DOT_MAP_STYLE: StyleSpecification = {
+  version: 8,
+  name: "spacetime-dot-land",
+  glyphs: "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+  sources: {
+    [MAPBOX_STREETS_SOURCE]: {
+      type: "vector",
+      url: "mapbox://mapbox.mapbox-streets-v8",
+    },
+  },
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#ffffff" },
+    },
+    {
+      id: WATER_QUERY_LAYER,
+      type: "fill",
+      source: MAPBOX_STREETS_SOURCE,
+      "source-layer": "water",
+      paint: {
+        "fill-color": "#ffffff",
+        "fill-opacity": 1,
+      },
+    },
+  ],
+};
