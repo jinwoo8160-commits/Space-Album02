@@ -13,7 +13,7 @@
  */
 
 import { COUNTRY_BY_ID } from "@/data/country-masks";
-import { BUILTIN_KEY_CATEGORIES } from "@/lib/categories";
+import { BUILTIN_KEY_CATEGORIES, dropBlackKeyCategories, fallbackBlackPhotoCategory, hexByCategoryList, isBlackKeyColor } from "@/lib/categories";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
 import { filterPhotos } from "@/lib/filters";
@@ -83,10 +83,17 @@ const MapContext = createContext<MapContextValue | null>(null);
 
 export function MapProvider({ children }: { children: ReactNode }) {
   const mapRef = useRef<MapRef>(null);
-  const [photos, setPhotos] = useState<Photo[]>(MOCK_PHOTOS);
+  const [photos, setPhotos] = useState<Photo[]>(() =>
+    MOCK_PHOTOS.map((photo) => ({
+      ...photo,
+      category: fallbackBlackPhotoCategory(photo.category),
+    })),
+  );
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>("kr");
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
-  const [keyCategories, setKeyCategories] = useState<KeyCategory[]>(BUILTIN_KEY_CATEGORIES);
+  const [keyCategories, setKeyCategories] = useState<KeyCategory[]>(() =>
+    dropBlackKeyCategories(BUILTIN_KEY_CATEGORIES),
+  );
   const [selectedCategories, setSelectedCategories] = useState<Set<CategoryFilterKey>>(
     () => new Set(),
   );
@@ -132,7 +139,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
       name: name.trim() || "새 카테고리",
       hex,
     };
-    setKeyCategories((prev) => [...prev, created]);
+    if (isBlackKeyColor(hex)) return created;
+    setKeyCategories((prev) => dropBlackKeyCategories([...prev, created]));
     return created;
   }, []);
 
@@ -149,10 +157,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setPhotoCategory = useCallback((photoId: string, category: CategoryColor) => {
+    const hexById = hexByCategoryList(keyCategories);
+    const nextCategory = fallbackBlackPhotoCategory(category, hexById);
     setPhotos((prev) =>
-      prev.map((photo) => (photo.id === photoId ? { ...photo, category } : photo)),
+      prev.map((photo) => (photo.id === photoId ? { ...photo, category: nextCategory } : photo)),
     );
-  }, []);
+  }, [keyCategories]);
 
   const flyToClusters = useCallback((lat: number, lng: number) => {
     mapRef.current?.easeTo({

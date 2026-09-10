@@ -9,6 +9,9 @@ export {
   hexForFilterKey,
   UNCLASSIFIED_HEX,
   UNCLASSIFIED_KEY,
+  dropBlackKeyCategories,
+  fallbackBlackPhotoCategory,
+  isBlackKeyColor,
 } from "@/lib/categories";
 
 /** 동 수준에서 "같은 좌표"로 볼 반올림 자릿수. */

@@ -41,7 +41,7 @@ export function RecordsScreen() {
               </h2>
               <div className="grid grid-cols-3 gap-1.5">
                 {group.photos.map((photo) => {
-                  const hex = hexForCategory(photo.category, hexById);
+                  const hex = photo.category ? hexForCategory(photo.category, hexById) : null;
                   return (
                     <button
                       key={photo.id}
@@ -51,10 +51,12 @@ export function RecordsScreen() {
                       aria-label={`${photo.title} · ${group.label}`}
                     >
                       <ScenicPhoto scene={photo.scene} className="h-full w-full" />
-                      <span
-                        className="absolute right-1.5 bottom-1.5 size-2.5 rounded-full ring-2 ring-white/90"
-                        style={{ backgroundColor: hex }}
-                      />
+                      {hex ? (
+                        <span
+                          className="absolute right-1.5 bottom-1.5 size-2.5 rounded-full ring-2 ring-white/90"
+                          style={{ backgroundColor: hex }}
+                        />
+                      ) : null}
                     </button>
                   );
                 })}

@@ -4,7 +4,7 @@ import {
   KOREA_GRID_BOUNDS,
   KOREA_ISLAND_SEEDS,
 } from "@/data/korea-territory";
-import { hexForFilterKey, UNCLASSIFIED_HEX } from "@/lib/constants";
+import { hexForFilterKey, isBlackKeyColor, UNCLASSIFIED_HEX } from "@/lib/constants";
 import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
 import type { CountryId, Photo } from "@/types/album";
@@ -144,6 +144,8 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
   if (cells.length === 0) return;
 
   for (const photo of photos) {
+    if (!photo.category) continue;
+
     let best = cells[0]!;
     let bestDist = Infinity;
     for (const cell of cells) {
@@ -155,7 +157,7 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
     }
 
     best.photoCount += 1;
-    const categoryKey = photo.category ?? "unclassified";
+    const categoryKey = photo.category;
 
     const reach = Math.ceil(KERNEL_RADIUS_CELLS);
     for (let dr = -reach; dr <= reach; dr += 1) {
@@ -201,7 +203,9 @@ function blendCategoryColors(scores: Map<string, number>, hexById: Record<string
   let weight = 0;
   scores.forEach((score, key) => {
     if (score <= 0) return;
-    const [cr, cg, cb] = parseHex(hexForFilterKey(key, hexById));
+    const hex = hexForFilterKey(key, hexById);
+    if (key === "unclassified" || isBlackKeyColor(hex)) return;
+    const [cr, cg, cb] = parseHex(hex);
     r += cr * score;
     g += cg * score;
     b += cb * score;

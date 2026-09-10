@@ -35,11 +35,11 @@ function matchesTime(photo: Photo, time: TimeFilter) {
 
 /**
  * 컬러핀 필터 규칙 (요구사항):
- * - 아무 핀도 안 고름 → 미분류 포함 전체
- * - 하나 이상 고름 → 고른 색만 (미분류 핀을 고르면 category === null)
+ * - 아무 핀도 안 고름 → 카테고리 없음 포함 전체
+ * - 하나 이상 고름 → 고른 색만
  */
 function matchesCategory(category: CategoryColor, selected: Set<CategoryFilterKey>) {
   if (selected.size === 0) return true;
-  if (category === null) return selected.has("unclassified");
+  if (category === null) return false;
   return selected.has(category);
 }

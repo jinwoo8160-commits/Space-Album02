@@ -1,6 +1,6 @@
 "use client";
 
-import { CATEGORY_PRESET_HEX, UNCLASSIFIED_HEX, UNCLASSIFIED_KEY } from "@/lib/categories";
+import { CATEGORY_PRESET_HEX } from "@/lib/categories";
 import { useMap } from "@/context/map-context";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -39,12 +39,6 @@ export function ColorPinFilter() {
           />
         );
       })}
-      <CategoryPin
-        label="미분류"
-        color={UNCLASSIFIED_HEX}
-        active={selectedCategories.has(UNCLASSIFIED_KEY)}
-        onToggle={() => toggleCategory(UNCLASSIFIED_KEY)}
-      />
       <button
         type="button"
         aria-label="새 카테고리 추가"

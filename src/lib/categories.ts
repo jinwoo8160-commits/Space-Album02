@@ -19,13 +19,11 @@ export const CATEGORY_PRESET_HEX = [
   "#00C2A8",
   "#4D7CFE",
   "#C44569",
-  "#2F3542",
   "#FF9FF3",
   "#54A0FF",
   "#5F27CD",
   "#10AC84",
   "#EE5A24",
-  "#222F3E",
 ];
 
 export const CATEGORY_HEX: Record<string, string> = Object.fromEntries(
@@ -55,5 +53,31 @@ export const CATEGORY_LABEL: Record<string, string> = {
   green: "초록",
   cyan: "파랑",
   red: "빨강",
-  unclassified: "미분류",
 };
+
+/** 키컬러로 쓰지 않는 검정·거의 검정. 기본 도트 색과 구분합니다. */
+export function isBlackKeyColor(hex: string): boolean {
+  const raw = hex.replace("#", "").trim();
+  const h = raw.length === 3 ? raw.split("").map((ch) => ch + ch).join("") : raw;
+  if (h.length < 6) return true;
+  const r = Number.parseInt(h.slice(0, 2), 16);
+  const g = Number.parseInt(h.slice(2, 4), 16);
+  const b = Number.parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return true;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 48;
+}
+
+export function dropBlackKeyCategories(categories: KeyCategory[]): KeyCategory[] {
+  return categories.filter((item) => !isBlackKeyColor(item.hex) && item.id !== UNCLASSIFIED_KEY);
+}
+
+export function fallbackBlackPhotoCategory(
+  category: CategoryColor,
+  hexById: Record<string, string> = CATEGORY_HEX,
+): CategoryColor {
+  if (!category || category === UNCLASSIFIED_KEY) return null;
+  const hex = hexById[category] ?? CATEGORY_HEX[category];
+  if (!hex || isBlackKeyColor(hex)) return null;
+  return category;
+}

@@ -2,10 +2,10 @@
 
 import { ScenicPhoto } from "@/components/map/ScenicPhoto";
 import { useMap } from "@/context/map-context";
-import { hexForCategory, UNCLASSIFIED_HEX } from "@/lib/constants";
+import { hexForCategory } from "@/lib/constants";
 import { hexByCategoryList } from "@/lib/categories";
 import { formatTakenAt } from "@/lib/album";
-import { ChevronLeft, ChevronRight, MapPin, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -60,8 +60,8 @@ export function PhotoDetailModal() {
   const categoryHex = hexForCategory(selectedPhoto.category, hexById);
   const categoryName =
     selectedPhoto.category === null
-      ? "미분류"
-      : (keyCategories.find((item) => item.id === selectedPhoto.category)?.name ?? "미분류");
+      ? "카테고리 없음"
+      : (keyCategories.find((item) => item.id === selectedPhoto.category)?.name ?? "카테고리 없음");
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/25 px-5 pb-28 pt-16">
@@ -139,10 +139,9 @@ export function PhotoDetailModal() {
               {formatTakenAt(selectedPhoto.takenAt)} · {selectedPhoto.districtLabel}
             </p>
             <p className="flex items-center gap-1.5 pt-0.5 text-[12px] text-neutral-500">
-              <span
-                className="size-2.5 rounded-full"
-                style={{ backgroundColor: categoryHex }}
-              />
+              {selectedPhoto.category ? (
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: categoryHex }} />
+              ) : null}
               {categoryName}
             </p>
           </div>
@@ -166,21 +165,6 @@ export function PhotoDetailModal() {
                   />
                 );
               })}
-              <button
-                type="button"
-                aria-label="미분류 지정"
-                onClick={() => setPhotoCategory(selectedPhoto.id, null)}
-                className="size-7 rounded-full"
-                style={{
-                  backgroundColor: UNCLASSIFIED_HEX,
-                  boxShadow:
-                    selectedPhoto.category === null
-                      ? `0 0 0 2px white, 0 0 0 4px ${UNCLASSIFIED_HEX}`
-                      : undefined,
-                }}
-              >
-                <Plus className="mx-auto size-3.5 text-white" strokeWidth={3} />
-              </button>
             </div>
           </div>
         </div>
