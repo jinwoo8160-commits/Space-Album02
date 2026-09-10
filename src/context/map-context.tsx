@@ -60,7 +60,7 @@ type MapContextValue = {
   selectedCategories: Set<CategoryFilterKey>;
   toggleCategory: (key: CategoryFilterKey) => void;
   keyCategories: KeyCategory[];
-  addKeyCategory: (name: string, hex: string) => KeyCategory;
+  addKeyCategory: (name: string, hex: string, assignToPhotoId?: string) => KeyCategory;
   removeKeyCategory: (id: string) => void;
   timeFilter: TimeFilter;
   setTimeFilter: (next: TimeFilter) => void;
@@ -133,7 +133,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const addKeyCategory = useCallback((name: string, hex: string): KeyCategory => {
+  const addKeyCategory = useCallback((name: string, hex: string, assignToPhotoId?: string): KeyCategory => {
     const created: KeyCategory = {
       id: `cat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       name: name.trim() || "새 카테고리",
@@ -141,6 +141,11 @@ export function MapProvider({ children }: { children: ReactNode }) {
     };
     if (isBlackKeyColor(hex)) return created;
     setKeyCategories((prev) => dropBlackKeyCategories([...prev, created]));
+    if (assignToPhotoId) {
+      setPhotos((prev) =>
+        prev.map((photo) => (photo.id === assignToPhotoId ? { ...photo, category: created.id } : photo)),
+      );
+    }
     return created;
   }, []);
 

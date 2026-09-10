@@ -78,6 +78,6 @@ export function fallbackBlackPhotoCategory(
 ): CategoryColor {
   if (!category || category === UNCLASSIFIED_KEY) return null;
   const hex = hexById[category] ?? CATEGORY_HEX[category];
-  if (!hex || isBlackKeyColor(hex)) return null;
+  if (hex && isBlackKeyColor(hex)) return null;
   return category;
 }

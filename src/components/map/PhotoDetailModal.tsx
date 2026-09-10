@@ -1,11 +1,12 @@
 "use client";
 
+import { AddCategoryDialog } from "@/components/map/AddCategoryDialog";
 import { ScenicPhoto } from "@/components/map/ScenicPhoto";
 import { useMap } from "@/context/map-context";
 import { hexForCategory } from "@/lib/constants";
 import { hexByCategoryList } from "@/lib/categories";
 import { formatTakenAt } from "@/lib/album";
-import { ChevronLeft, ChevronRight, MapPin, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -18,11 +19,13 @@ export function PhotoDetailModal() {
     closePhoto,
     setPhotoCategory,
     keyCategories,
+    addKeyCategory,
     stepAlbumPhoto,
     albumIndex,
     albumCount,
   } = useMap();
   const [slide, setSlide] = useState<"next" | "prev" | "in">("in");
+  const [addOpen, setAddOpen] = useState(false);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -46,12 +49,17 @@ export function PhotoDetailModal() {
         event.preventDefault();
         go(1);
       } else if (event.key === "Escape") {
+        if (addOpen) {
+          event.preventDefault();
+          setAddOpen(false);
+          return;
+        }
         closePhoto();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closePhoto, go, selectedPhoto]);
+  }, [addOpen, closePhoto, go, selectedPhoto]);
 
   if (!selectedPhoto) return null;
 
@@ -165,10 +173,30 @@ export function PhotoDetailModal() {
                   />
                 );
               })}
+              <button
+                type="button"
+                aria-label="새 카테고리 추가"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setAddOpen(true);
+                }}
+                className="flex size-7 items-center justify-center rounded-full bg-neutral-900 text-white"
+              >
+                <Plus className="size-3.5" strokeWidth={3} />
+              </button>
             </div>
           </div>
         </div>
       </div>
+      {addOpen ? (
+        <AddCategoryDialog
+          onClose={() => setAddOpen(false)}
+          onCreate={(name, hex) => {
+            addKeyCategory(name, hex, selectedPhoto.id);
+            setAddOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
