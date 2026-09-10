@@ -42,8 +42,8 @@ const GRID_CELLS: Record<PreviewMapId, number> = {
 };
 
 export const PREVIEW_DOT_RADIUS: Record<PreviewMapId, number> = {
-  // 세계 미니맵 줌에 맞춰 도트를 키워 윤곽이 풍성하게 보이게 한다.
-  world: 1.9,
+  // 세계 미니맵은 촘촘한 격자 위에서 도트만 조금 작게 잡아 격자감이 남게 한다.
+  world: 1.35,
   kr: 1.35,
   jp: 1.3,
   cn: 1.25,
