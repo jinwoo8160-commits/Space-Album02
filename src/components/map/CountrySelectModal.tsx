@@ -1,6 +1,6 @@
 "use client";
 
-import { COUNTRIES, WORLD_COUNTRY } from "@/data/country-masks";
+import { COUNTRIES } from "@/data/country-masks";
 import { MOCK_PHOTOS } from "@/data/mock-photos";
 import { useMap } from "@/context/map-context";
 import { unlockCountryMessage } from "@/lib/korean";
@@ -20,7 +20,7 @@ const CountryMiniMap = dynamic(
 const UNLOCKED_COUNTRY_ID: CountryId = "kr";
 
 /**
- * 국가 선택 패널. 지금은 대한민국만 열리고, 나머지 나라·세계 카드는 잠겨 있습니다.
+ * 국가 선택 패널. 세계지도는 프리뷰만 보여 주고, 지금은 대한민국만 고를 수 있습니다.
  */
 export function CountrySelectModal() {
   const { countryModalOpen, setCountryModalOpen, setSelectedCountryId, selectedCountryId } =
@@ -52,17 +52,14 @@ export function CountrySelectModal() {
         </button>
       </div>
 
+      {/*
+        세계지도는 국가 선택지가 아니라 시각 프리뷰만 보여 준다.
+        자물쇠·딤·클릭 토스트를 빼고, 지도 영역은 pointer-events로 입력을 막는다.
+      */}
       <div className="relative px-4 pt-2">
-        <button
-          type="button"
-          aria-label="세계 (잠김)"
-          onClick={() => noticeLocked(WORLD_COUNTRY.name)}
-          className="relative block h-36 w-full overflow-hidden rounded-2xl border border-neutral-200 bg-white"
-        >
-          <LockedPreview>
-            <CountryMiniMap id="world" className="h-full w-full" />
-          </LockedPreview>
-        </button>
+        <div className="pointer-events-none relative h-36 w-full overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+          <CountryMiniMap id="world" className="h-full w-full" />
+        </div>
         <button
           type="button"
           aria-label="공유"

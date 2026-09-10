@@ -33,7 +33,8 @@ const ISO_BY_PREVIEW: Record<PreviewMapId, string[] | null> = {
 };
 
 const GRID_CELLS: Record<PreviewMapId, number> = {
-  world: 58,
+  // 세계 미니맵만 격자를 촘촘히 잡아 대륙이 비어 보이지 않게 한다.
+  world: 102,
   kr: 20,
   jp: 24,
   cn: 34,
@@ -41,7 +42,8 @@ const GRID_CELLS: Record<PreviewMapId, number> = {
 };
 
 export const PREVIEW_DOT_RADIUS: Record<PreviewMapId, number> = {
-  world: 1.15,
+  // 세계 미니맵 줌에 맞춰 도트를 키워 윤곽이 풍성하게 보이게 한다.
+  world: 1.9,
   kr: 1.35,
   jp: 1.3,
   cn: 1.25,
@@ -49,11 +51,19 @@ export const PREVIEW_DOT_RADIUS: Record<PreviewMapId, number> = {
 };
 
 const FIT_MAX_ZOOM: Record<PreviewMapId, number> = {
-  world: 1.55,
+  world: 1.72,
   kr: 5.35,
   jp: 4.15,
   cn: 2.55,
   us: 2.75,
+};
+
+const FIT_PADDING: Record<PreviewMapId, number> = {
+  world: 6,
+  kr: 10,
+  jp: 10,
+  cn: 10,
+  us: 10,
 };
 
 /** 일본은 대마도·한반도가 빠지도록 본토 쪽으로 조금 좁힙니다. */
@@ -69,6 +79,7 @@ function previewBounds(id: PreviewMapId): GeoBounds {
 export function previewFitBounds(id: PreviewMapId): {
   bounds: [[number, number], [number, number]];
   maxZoom: number;
+  padding: number;
 } {
   const bounds = previewBounds(id);
   return {
@@ -77,6 +88,7 @@ export function previewFitBounds(id: PreviewMapId): {
       [bounds.maxLng, bounds.maxLat],
     ],
     maxZoom: FIT_MAX_ZOOM[id],
+    padding: FIT_PADDING[id],
   };
 }
 

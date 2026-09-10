@@ -34,7 +34,7 @@ function ensurePreviewDots(map: MapboxMap, id: PreviewMapId): boolean {
         "circle-radius": PREVIEW_DOT_RADIUS[id],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
-        "circle-opacity": 0.78,
+        "circle-opacity": id === "world" ? 0.9 : 0.78,
       },
     });
   }
@@ -74,7 +74,7 @@ export function CountryMiniMap({
         mapStyle={PREVIEW_MAP_STYLE}
         initialViewState={{
           bounds: fit.bounds,
-          fitBoundsOptions: { padding: 10, maxZoom: fit.maxZoom },
+          fitBoundsOptions: { padding: fit.padding, maxZoom: fit.maxZoom },
         }}
         interactive={false}
         attributionControl={false}
@@ -93,7 +93,7 @@ export function CountryMiniMap({
         onLoad={(event) => {
           const map = event.target;
           applyPreviewCountryFilter(map, id);
-          map.fitBounds(fit.bounds, { padding: 10, maxZoom: fit.maxZoom, duration: 0 });
+          map.fitBounds(fit.bounds, { padding: fit.padding, maxZoom: fit.maxZoom, duration: 0 });
           map.once("idle", paintDots);
         }}
         onIdle={() => {
