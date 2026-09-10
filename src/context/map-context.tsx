@@ -17,6 +17,7 @@ import { BUILTIN_KEY_CATEGORIES } from "@/lib/categories";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
 import { filterPhotos } from "@/lib/filters";
+import { sortPhotosByTakenAt, type AlbumSort } from "@/lib/album";
 import {
   CLUSTER_ZOOM,
   COUNTRY_FIT_MAX_ZOOM,
@@ -67,6 +68,12 @@ type MapContextValue = {
   selectedPhoto: Photo | null;
   openPhoto: (id: string) => void;
   closePhoto: () => void;
+  stepAlbumPhoto: (delta: -1 | 1) => void;
+  albumPhotos: Photo[];
+  albumSort: AlbumSort;
+  setAlbumSort: (sort: AlbumSort) => void;
+  albumIndex: number;
+  albumCount: number;
   setPhotoCategory: (photoId: string, category: CategoryColor) => void;
   countryModalOpen: boolean;
   setCountryModalOpen: (open: boolean) => void;
@@ -90,6 +97,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   });
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [countryModalOpen, setCountryModalOpen] = useState(false);
+  const [albumSort, setAlbumSort] = useState<AlbumSort>("desc");
 
   const overlayMode = overlayModeFromZoom(mapZoom);
 
@@ -98,10 +106,16 @@ export function MapProvider({ children }: { children: ReactNode }) {
     [photos, selectedCountryId, timeFilter, selectedCategories],
   );
 
+  const albumPhotos = useMemo(() => sortPhotosByTakenAt(photos, albumSort), [photos, albumSort]);
+
   const selectedPhoto = useMemo(
     () => photos.find((photo) => photo.id === selectedPhotoId) ?? null,
     [photos, selectedPhotoId],
   );
+
+  const albumIndex = selectedPhotoId
+    ? albumPhotos.findIndex((photo) => photo.id === selectedPhotoId)
+    : -1;
 
   const toggleCategory = useCallback((key: CategoryFilterKey) => {
     setSelectedCategories((prev) => {
@@ -180,6 +194,18 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const openPhoto = useCallback((id: string) => setSelectedPhotoId(id), []);
   const closePhoto = useCallback(() => setSelectedPhotoId(null), []);
 
+  const stepAlbumPhoto = useCallback(
+    (delta: -1 | 1) => {
+      setSelectedPhotoId((current) => {
+        if (!current) return current;
+        const index = albumPhotos.findIndex((photo) => photo.id === current);
+        const next = albumPhotos[index + delta];
+        return next?.id ?? current;
+      });
+    },
+    [albumPhotos],
+  );
+
   const value: MapContextValue = {
     photos,
     filteredPhotos,
@@ -202,6 +228,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
     selectedPhoto,
     openPhoto,
     closePhoto,
+    stepAlbumPhoto,
+    albumPhotos,
+    albumSort,
+    setAlbumSort,
+    albumIndex,
+    albumCount: albumPhotos.length,
     setPhotoCategory,
     countryModalOpen,
     setCountryModalOpen,

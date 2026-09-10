@@ -4,7 +4,6 @@ import { AlbumMapDynamic } from "@/components/map/AlbumMapDynamic";
 import { ColorPinFilter } from "@/components/map/ColorPinFilter";
 import { CountrySelectButton } from "@/components/map/CountrySelectButton";
 import { CountrySelectModal } from "@/components/map/CountrySelectModal";
-import { PhotoDetailModal } from "@/components/map/PhotoDetailModal";
 import { TimePicker } from "@/components/map/TimePicker";
 import { ZoomControls } from "@/components/map/ZoomControls";
 import { useMap } from "@/context/map-context";
@@ -58,7 +57,6 @@ export function MapScreen() {
       </p>
 
       <CountrySelectModal />
-      <PhotoDetailModal />
     </section>
   );
 }
