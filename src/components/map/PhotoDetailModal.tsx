@@ -7,11 +7,12 @@ import { hexForCategory } from "@/lib/constants";
 import { hexByCategoryList } from "@/lib/categories";
 import { formatTakenAt } from "@/lib/album";
 import { ChevronLeft, ChevronRight, MapPin, Plus, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * 지도 핀·기록 그리드가 같이 쓰는 상세 모달.
- * 연대기 이전/다음은 화살표, 키보드, 스와이프로 움직입니다.
+ * 이전/다음 넘기기는 기록 탭에서만 화살표·키보드·스와이프로 동작합니다.
  */
 export function PhotoDetailModal() {
   const {
@@ -24,6 +25,8 @@ export function PhotoDetailModal() {
     albumIndex,
     albumCount,
   } = useMap();
+  const pathname = usePathname();
+  const canBrowseAlbum = pathname === "/records";
   const [slide, setSlide] = useState<"next" | "prev" | "in">("in");
   const [addOpen, setAddOpen] = useState(false);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
@@ -31,21 +34,22 @@ export function PhotoDetailModal() {
 
   const go = useCallback(
     (delta: -1 | 1) => {
+      if (!canBrowseAlbum) return;
       if (delta < 0 && albumIndex <= 0) return;
       if (delta > 0 && albumIndex >= albumCount - 1) return;
       setSlide(delta > 0 ? "next" : "prev");
       stepAlbumPhoto(delta);
     },
-    [albumCount, albumIndex, stepAlbumPhoto],
+    [albumCount, albumIndex, canBrowseAlbum, stepAlbumPhoto],
   );
 
   useEffect(() => {
     if (!selectedPhoto) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft") {
+      if (canBrowseAlbum && event.key === "ArrowLeft") {
         event.preventDefault();
         go(-1);
-      } else if (event.key === "ArrowRight") {
+      } else if (canBrowseAlbum && event.key === "ArrowRight") {
         event.preventDefault();
         go(1);
       } else if (event.key === "Escape") {
@@ -59,7 +63,7 @@ export function PhotoDetailModal() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addOpen, closePhoto, go, selectedPhoto]);
+  }, [addOpen, canBrowseAlbum, closePhoto, go, selectedPhoto]);
 
   if (!selectedPhoto) return null;
 
@@ -87,22 +91,34 @@ export function PhotoDetailModal() {
         >
           <div
             className="relative overflow-hidden rounded-md bg-neutral-100 touch-pan-y"
-            onPointerDown={(event) => {
-              if (event.pointerType === "mouse" && event.button !== 0) return;
-              touchStart.current = { x: event.clientX, y: event.clientY };
-            }}
-            onPointerUp={(event) => {
-              const start = touchStart.current;
-              touchStart.current = null;
-              if (!start) return;
-              const dx = event.clientX - start.x;
-              const dy = event.clientY - start.y;
-              if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
-              go(dx < 0 ? 1 : -1);
-            }}
-            onPointerCancel={() => {
-              touchStart.current = null;
-            }}
+            onPointerDown={
+              canBrowseAlbum
+                ? (event) => {
+                    if (event.pointerType === "mouse" && event.button !== 0) return;
+                    touchStart.current = { x: event.clientX, y: event.clientY };
+                  }
+                : undefined
+            }
+            onPointerUp={
+              canBrowseAlbum
+                ? (event) => {
+                    const start = touchStart.current;
+                    touchStart.current = null;
+                    if (!start) return;
+                    const dx = event.clientX - start.x;
+                    const dy = event.clientY - start.y;
+                    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+                    go(dx < 0 ? 1 : -1);
+                  }
+                : undefined
+            }
+            onPointerCancel={
+              canBrowseAlbum
+                ? () => {
+                    touchStart.current = null;
+                  }
+                : undefined
+            }
           >
             <ScenicPhoto scene={selectedPhoto.scene} className="aspect-square w-full" />
             <button
@@ -113,7 +129,7 @@ export function PhotoDetailModal() {
             >
               <X className="size-4" />
             </button>
-            {hasPrev ? (
+            {canBrowseAlbum && hasPrev ? (
               <button
                 type="button"
                 aria-label="이전 사진"
@@ -123,7 +139,7 @@ export function PhotoDetailModal() {
                 <ChevronLeft className="size-4" />
               </button>
             ) : null}
-            {hasNext ? (
+            {canBrowseAlbum && hasNext ? (
               <button
                 type="button"
                 aria-label="다음 사진"
