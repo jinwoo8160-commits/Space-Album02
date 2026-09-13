@@ -21,8 +21,8 @@ const PHOTO_SOURCE = "album-photo-dots";
 const PHOTO_LAYER = "album-photo-circles";
 const PIN_SOURCE = "album-pin-dot";
 const PIN_LAYER = "album-pin-circle";
-const SAT_SOURCE = "album-satellite";
-const SAT_LAYER = "album-satellite-raster";
+const SAT_SOURCE = "album-satellite-v2";
+const SAT_LAYER = "album-satellite-raster-v2";
 const SAT_ROAD_LAYER = "album-satellite-roads";
 const SAT_LABEL_LAYER = "album-satellite-labels";
 
@@ -87,6 +87,14 @@ function applyAlbumPinView(map: MapboxMap, pinned: boolean) {
   if (map.getLayer(SAT_LAYER)) {
     map.setPaintProperty(SAT_LAYER, "raster-opacity", pinned ? 1 : 0);
   }
+  if (!pinned || !map.getLayer(SAT_LAYER) || !map.getLayer(PIN_LAYER)) return;
+  try {
+    map.moveLayer(SAT_LAYER, PIN_LAYER);
+    if (map.getLayer(SAT_ROAD_LAYER)) map.moveLayer(SAT_ROAD_LAYER, PIN_LAYER);
+    if (map.getLayer(SAT_LABEL_LAYER)) map.moveLayer(SAT_LABEL_LAYER, PIN_LAYER);
+  } catch {
+    /* 레이어 순서는 최선 노력입니다. */
+  }
 }
 
 function jumpToSouthOverview(map: MapboxMap) {
@@ -117,9 +125,10 @@ function ensureLayers(map: MapboxMap) {
     map.addSource(SAT_SOURCE, {
       type: "raster",
       tiles: [
-        `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.webp?access_token=${MAPBOX_TOKEN}`,
+        `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`,
       ],
       tileSize: 256,
+      maxzoom: 22,
       attribution: "© Mapbox © Maxar",
     });
   }
