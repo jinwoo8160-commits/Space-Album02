@@ -7,11 +7,11 @@ import type { FeatureCollection, Point } from "geojson";
 
 /**
  * 앨범 미니맵(200px, 남한 줌 4.15)용 세밀 격자.
- * 위치 도트 `circle-radius` 는 0.05px 로 고정합니다.
+ * 위치 도트 `circle-radius` 는 0.1px 로 고정합니다.
  */
 export const ALBUM_MINI_MAP_PX = 200;
 export const ALBUM_LAND_CELLS = 280;
-export const ALBUM_LAND_RADIUS = 0.05;
+export const ALBUM_LAND_RADIUS = 0.1;
 
 export function buildKoreaAlbumLandDots(): FeatureCollection<Point> {
   const bounds = KOREA_GRID_BOUNDS;
