@@ -14,8 +14,9 @@ import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import { useEffect, useRef, useState } from "react";
 import Map, { type MapRef } from "react-map-gl/mapbox";
 
-const LAND_SOURCE = "album-land-dots-v3";
-const LAND_LAYER = "album-land-circles-v3";
+const LAND_SOURCE = "album-land-dots-v4";
+const LAND_LAYER = "album-land-circles-v4";
+const LAND_DOT_COLOR = "#6e6e6e";
 const PHOTO_SOURCE = "album-photo-dots";
 const PHOTO_LAYER = "album-photo-circles";
 const PIN_SOURCE = "album-pin-dot";
@@ -60,8 +61,16 @@ function pinCollection(photo: Photo | null): FeatureCollection<Point> {
   };
 }
 
+function styleReady(map: MapboxMap) {
+  try {
+    return Boolean(map.isStyleLoaded() && map.getStyle());
+  } catch {
+    return false;
+  }
+}
+
 function setVisible(map: MapboxMap, layerId: string, visible: boolean) {
-  if (!map.getLayer(layerId)) return;
+  if (!styleReady(map) || !map.getLayer(layerId)) return;
   const next = visible ? "visible" : "none";
   if (map.getLayoutProperty(layerId, "visibility") === next) return;
   map.setLayoutProperty(layerId, "visibility", next);
@@ -75,6 +84,9 @@ function applyAlbumPinView(map: MapboxMap, pinned: boolean) {
   setVisible(map, SAT_LAYER, pinned);
   setVisible(map, SAT_ROAD_LAYER, pinned);
   setVisible(map, SAT_LABEL_LAYER, pinned);
+  if (map.getLayer(SAT_LAYER)) {
+    map.setPaintProperty(SAT_LAYER, "raster-opacity", pinned ? 1 : 0);
+  }
 }
 
 function jumpToSouthOverview(map: MapboxMap) {
@@ -99,12 +111,16 @@ function flyToPhoto(map: MapboxMap, photo: Photo) {
 }
 
 function ensureLayers(map: MapboxMap) {
+  if (!styleReady(map)) return;
   const empty: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
   if (!map.getSource(SAT_SOURCE)) {
     map.addSource(SAT_SOURCE, {
       type: "raster",
-      url: "mapbox://mapbox.satellite",
+      tiles: [
+        `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.webp?access_token=${MAPBOX_TOKEN}`,
+      ],
       tileSize: 256,
+      attribution: "© Mapbox © Maxar",
     });
   }
   if (!map.getLayer(SAT_LAYER)) {
@@ -173,12 +189,14 @@ function ensureLayers(map: MapboxMap) {
       paint: {
         "circle-radius": ALBUM_LAND_RADIUS,
         "circle-pitch-alignment": "viewport",
-        "circle-color": "#c8c8c8",
-        "circle-opacity": 0.95,
+        "circle-color": LAND_DOT_COLOR,
+        "circle-opacity": 1,
       },
     });
   } else {
     map.setPaintProperty(LAND_LAYER, "circle-radius", ALBUM_LAND_RADIUS);
+    map.setPaintProperty(LAND_LAYER, "circle-color", LAND_DOT_COLOR);
+    map.setPaintProperty(LAND_LAYER, "circle-opacity", 1);
   }
   if (!map.getSource(PHOTO_SOURCE)) {
     map.addSource(PHOTO_SOURCE, { type: "geojson", data: empty });
@@ -193,7 +211,7 @@ function ensureLayers(map: MapboxMap) {
           "interpolate",
           ["linear"],
           ["zoom"],
-          6.2,
+          ALBUM_OVERVIEW_ZOOM,
           1.15,
           9,
           2.8,
@@ -215,7 +233,15 @@ function ensureLayers(map: MapboxMap) {
       type: "circle",
       source: PIN_SOURCE,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6.2, 2.6, 12.6, 8],
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          ALBUM_OVERVIEW_ZOOM,
+          2.6,
+          12.6,
+          8,
+        ],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
         "circle-stroke-width": 2,
@@ -254,6 +280,8 @@ export function AlbumMiniMap({
     latitude: ALBUM_SOUTH_CENTER[1],
     zoom: ALBUM_OVERVIEW_ZOOM,
   });
+  const [mapEpoch, setMapEpoch] = useState(0);
+  const wasPinned = useRef(false);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -267,18 +295,33 @@ export function AlbumMiniMap({
   }, [photos, hexById]);
 
   useEffect(() => {
+    const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
+    if (wasPinned.current && !isPinned) {
+      ready.current = false;
+      lockOverview.current = true;
+      setView({
+        longitude: ALBUM_SOUTH_CENTER[0],
+        latitude: ALBUM_SOUTH_CENTER[1],
+        zoom: ALBUM_OVERVIEW_ZOOM,
+      });
+      setMapEpoch((epoch) => epoch + 1);
+      wasPinned.current = false;
+      return;
+    }
+    wasPinned.current = isPinned;
+
     const map = mapRef.current?.getMap();
-    if (!map || !ready.current) return;
+    if (!map || !ready.current || !styleReady(map)) return;
     try {
-      if (!map.getSource(PIN_SOURCE)) return;
+      ensureLayers(map);
     } catch {
       return;
     }
+    if (!map.getSource(PIN_SOURCE)) return;
     (map.getSource(PIN_SOURCE) as GeoJSONSource).setData(pinCollection(pinnedPhoto));
     if (pinColor && map.getLayer(PIN_LAYER)) {
       map.setPaintProperty(PIN_LAYER, "circle-color", pinColor);
     }
-    const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
     map.stop();
     applyAlbumPinView(map, isPinned);
     if (isPinned && pinnedPhoto) {
@@ -298,6 +341,7 @@ export function AlbumMiniMap({
       zoom: ALBUM_OVERVIEW_ZOOM,
     });
     jumpToSouthOverview(map);
+    map.resize();
     map.triggerRepaint();
     const unlock = window.setTimeout(() => {
       lockOverview.current = false;
@@ -312,6 +356,7 @@ export function AlbumMiniMap({
   return (
     <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
       <Map
+        key={mapEpoch}
         ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
         mapStyle={PREVIEW_MAP_STYLE}
