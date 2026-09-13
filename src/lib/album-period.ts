@@ -4,7 +4,7 @@ export type AlbumRange = "year" | "month" | "week" | "day";
 
 /** 남한 중심. 북한을 빼고 미니맵에 남한이 차게 보이게 합니다. */
 export const ALBUM_SOUTH_CENTER: [number, number] = [127.8, 36.3];
-export const ALBUM_OVERVIEW_ZOOM = 4.45;
+export const ALBUM_OVERVIEW_ZOOM = 6.2;
 
 export const ALBUM_RANGES: { id: AlbumRange; label: string }[] = [
   { id: "year", label: "년" },

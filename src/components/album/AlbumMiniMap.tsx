@@ -5,7 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { ALBUM_LAND_RADIUS, KOREA_ALBUM_LAND_DOTS } from "@/lib/album-land";
 import { ALBUM_OVERVIEW_ZOOM, ALBUM_SOUTH_CENTER } from "@/lib/album-period";
 import { CATEGORY_HEX, hexForCategory } from "@/lib/categories";
-import { MAPBOX_TOKEN } from "@/lib/map-style";
+import { MAPBOX_STREETS_SOURCE, MAPBOX_TOKEN, WATER_QUERY_LAYER } from "@/lib/map-style";
 import { PREVIEW_MAP_STYLE } from "@/lib/preview-dots";
 import { PIN_ZOOM } from "@/lib/zoom";
 import type { Photo } from "@/types/album";
@@ -20,6 +20,10 @@ const PHOTO_SOURCE = "album-photo-dots";
 const PHOTO_LAYER = "album-photo-circles";
 const PIN_SOURCE = "album-pin-dot";
 const PIN_LAYER = "album-pin-circle";
+const SAT_SOURCE = "album-satellite";
+const SAT_LAYER = "album-satellite-raster";
+const SAT_ROAD_LAYER = "album-satellite-roads";
+const SAT_LABEL_LAYER = "album-satellite-labels";
 
 function photoCollection(
   photos: Photo[],
@@ -56,6 +60,23 @@ function pinCollection(photo: Photo | null): FeatureCollection<Point> {
   };
 }
 
+function setVisible(map: MapboxMap, layerId: string, visible: boolean) {
+  if (!map.getLayer(layerId)) return;
+  const next = visible ? "visible" : "none";
+  if (map.getLayoutProperty(layerId, "visibility") === next) return;
+  map.setLayoutProperty(layerId, "visibility", next);
+}
+
+/** 핀이 켜지면 도트·흰 수역을 숨기고 위성 전경을 켭니다. setStyle 은 쓰지 않습니다. */
+function applyAlbumPinView(map: MapboxMap, pinned: boolean) {
+  setVisible(map, LAND_LAYER, !pinned);
+  setVisible(map, PHOTO_LAYER, !pinned);
+  setVisible(map, WATER_QUERY_LAYER, !pinned);
+  setVisible(map, SAT_LAYER, pinned);
+  setVisible(map, SAT_ROAD_LAYER, pinned);
+  setVisible(map, SAT_LABEL_LAYER, pinned);
+}
+
 function jumpToSouthOverview(map: MapboxMap) {
   map.jumpTo({
     center: ALBUM_SOUTH_CENTER,
@@ -65,8 +86,90 @@ function jumpToSouthOverview(map: MapboxMap) {
   });
 }
 
+function flyToSouthOverview(map: MapboxMap) {
+  map.flyTo({
+    center: ALBUM_SOUTH_CENTER,
+    zoom: ALBUM_OVERVIEW_ZOOM,
+    duration: 920,
+    essential: true,
+    bearing: 0,
+    pitch: 0,
+  });
+}
+
+function flyToPhoto(map: MapboxMap, photo: Photo) {
+  map.flyTo({
+    center: [photo.lng, photo.lat],
+    zoom: PIN_ZOOM,
+    duration: 920,
+    essential: true,
+    bearing: 0,
+    pitch: 0,
+  });
+}
+
 function ensureLayers(map: MapboxMap) {
   const empty: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
+  if (!map.getSource(SAT_SOURCE)) {
+    map.addSource(SAT_SOURCE, {
+      type: "raster",
+      url: "mapbox://mapbox.satellite",
+      tileSize: 256,
+    });
+  }
+  if (!map.getLayer(SAT_LAYER)) {
+    map.addLayer({
+      id: SAT_LAYER,
+      type: "raster",
+      source: SAT_SOURCE,
+      layout: { visibility: "none" },
+      paint: {
+        "raster-opacity": 1,
+        "raster-fade-duration": 280,
+      },
+    });
+  }
+  if (!map.getLayer(SAT_ROAD_LAYER)) {
+    map.addLayer({
+      id: SAT_ROAD_LAYER,
+      type: "line",
+      source: MAPBOX_STREETS_SOURCE,
+      "source-layer": "road",
+      minzoom: 9,
+      layout: {
+        visibility: "none",
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": "#ffffff",
+        "line-opacity": 0.42,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.4, 12.6, 1.6, 15, 3.2],
+      },
+    });
+  }
+  if (!map.getLayer(SAT_LABEL_LAYER)) {
+    map.addLayer({
+      id: SAT_LABEL_LAYER,
+      type: "symbol",
+      source: MAPBOX_STREETS_SOURCE,
+      "source-layer": "place_label",
+      minzoom: 10,
+      layout: {
+        visibility: "none",
+        "text-field": ["coalesce", ["get", "name_ko"], ["get", "name"]],
+        "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 14, 15],
+        "text-padding": 8,
+        "text-max-width": 8,
+      },
+      paint: {
+        "text-color": "#ffffff",
+        "text-halo-color": "#111111",
+        "text-halo-width": 1.1,
+      },
+    });
+  }
   if (!map.getSource(LAND_SOURCE)) {
     map.addSource(LAND_SOURCE, { type: "geojson", data: KOREA_ALBUM_LAND_DOTS });
   } else {
@@ -81,7 +184,7 @@ function ensureLayers(map: MapboxMap) {
         "circle-radius": ALBUM_LAND_RADIUS,
         "circle-pitch-alignment": "viewport",
         "circle-color": "#c8c8c8",
-        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 4.4, 0.95, 8, 0.22, 10, 0],
+        "circle-opacity": 0.95,
       },
     });
   } else {
@@ -100,7 +203,7 @@ function ensureLayers(map: MapboxMap) {
           "interpolate",
           ["linear"],
           ["zoom"],
-          4.4,
+          6.2,
           1.15,
           9,
           2.8,
@@ -122,7 +225,7 @@ function ensureLayers(map: MapboxMap) {
       type: "circle",
       source: PIN_SOURCE,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 4.4, 2.6, 12.6, 8],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6.2, 2.6, 12.6, 8],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
         "circle-stroke-width": 2,
@@ -133,7 +236,7 @@ function ensureLayers(map: MapboxMap) {
 }
 
 /**
- * 앨범 중앙 남한 미리보기. 카메라는 남한 중심에 고정되고, 핀을 찍으면 확대됩니다.
+ * 앨범 중앙 남한 미리보기. 핀을 찍으면 위성 전경으로 날아가고, 해제하면 도트 지도로 돌아갑니다.
  */
 export function AlbumMiniMap({
   photos,
@@ -168,16 +271,13 @@ export function AlbumMiniMap({
     if (pinColor && map.getLayer(PIN_LAYER)) {
       map.setPaintProperty(PIN_LAYER, "circle-color", pinColor);
     }
-    if (pinnedPhoto && pinnedPhoto.hasGps !== false) {
-      map.easeTo({
-        center: [pinnedPhoto.lng, pinnedPhoto.lat],
-        zoom: PIN_ZOOM,
-        duration: 720,
-        essential: true,
-      });
+    const pinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
+    applyAlbumPinView(map, pinned);
+    if (pinned && pinnedPhoto) {
+      flyToPhoto(map, pinnedPhoto);
       return;
     }
-    jumpToSouthOverview(map);
+    flyToSouthOverview(map);
   }, [pinnedPhoto, pinColor]);
 
   if (!MAPBOX_TOKEN) {
@@ -196,7 +296,7 @@ export function AlbumMiniMap({
           zoom: ALBUM_OVERVIEW_ZOOM,
         }}
         minZoom={ALBUM_OVERVIEW_ZOOM}
-        maxZoom={PIN_ZOOM}
+        maxZoom={Math.max(PIN_ZOOM, 15)}
         interactive={false}
         attributionControl={false}
         dragPan={false}
@@ -227,7 +327,10 @@ export function AlbumMiniMap({
             photoCollection(photosRef.current, hexRef.current),
           );
           (map.getSource(PIN_SOURCE) as GeoJSONSource).setData(pinCollection(pinnedRef.current));
-          jumpToSouthOverview(map);
+          const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
+          applyAlbumPinView(map, pinned);
+          if (pinned && pinnedRef.current) flyToPhoto(map, pinnedRef.current);
+          else jumpToSouthOverview(map);
           ready.current = true;
         }}
       />
