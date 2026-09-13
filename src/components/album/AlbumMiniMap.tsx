@@ -11,7 +11,7 @@ import { PIN_ZOOM } from "@/lib/zoom";
 import type { Photo } from "@/types/album";
 import type { FeatureCollection, Point } from "geojson";
 import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Map, { type MapRef } from "react-map-gl/mapbox";
 
 const LAND_SOURCE = "album-land-dots-v3";
@@ -86,36 +86,7 @@ function jumpToSouthOverview(map: MapboxMap) {
   });
 }
 
-let restoreTimer: number | null = null;
-
-function clearRestoreTimer() {
-  if (restoreTimer !== null) {
-    window.clearTimeout(restoreTimer);
-    restoreTimer = null;
-  }
-}
-
-function flyToSouthOverview(map: MapboxMap) {
-  clearRestoreTimer();
-  map.stop();
-  map.setMinZoom(4);
-  map.easeTo({
-    center: ALBUM_SOUTH_CENTER,
-    zoom: ALBUM_OVERVIEW_ZOOM,
-    duration: 700,
-    essential: true,
-    bearing: 0,
-    pitch: 0,
-  });
-  restoreTimer = window.setTimeout(() => {
-    jumpToSouthOverview(map);
-    map.triggerRepaint();
-    restoreTimer = null;
-  }, 720);
-}
-
 function flyToPhoto(map: MapboxMap, photo: Photo) {
-  clearRestoreTimer();
   map.stop();
   map.flyTo({
     center: [photo.lng, photo.lat],
@@ -273,9 +244,16 @@ export function AlbumMiniMap({
   const pinnedRef = useRef(pinnedPhoto);
   const hexRef = useRef(hexById);
   const ready = useRef(false);
+  const lockOverview = useRef(false);
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
   hexRef.current = hexById;
+
+  const [view, setView] = useState({
+    longitude: ALBUM_SOUTH_CENTER[0],
+    latitude: ALBUM_SOUTH_CENTER[1],
+    zoom: ALBUM_OVERVIEW_ZOOM,
+  });
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -300,11 +278,31 @@ export function AlbumMiniMap({
     if (pinColor && map.getLayer(PIN_LAYER)) {
       map.setPaintProperty(PIN_LAYER, "circle-color", pinColor);
     }
-    const pinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
+    const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
     map.stop();
-    applyAlbumPinView(map, pinned);
-    if (pinned && pinnedPhoto) flyToPhoto(map, pinnedPhoto);
-    else flyToSouthOverview(map);
+    applyAlbumPinView(map, isPinned);
+    if (isPinned && pinnedPhoto) {
+      lockOverview.current = false;
+      setView({
+        longitude: pinnedPhoto.lng,
+        latitude: pinnedPhoto.lat,
+        zoom: PIN_ZOOM,
+      });
+      flyToPhoto(map, pinnedPhoto);
+      return;
+    }
+    lockOverview.current = true;
+    setView({
+      longitude: ALBUM_SOUTH_CENTER[0],
+      latitude: ALBUM_SOUTH_CENTER[1],
+      zoom: ALBUM_OVERVIEW_ZOOM,
+    });
+    jumpToSouthOverview(map);
+    map.triggerRepaint();
+    const unlock = window.setTimeout(() => {
+      lockOverview.current = false;
+    }, 80);
+    return () => window.clearTimeout(unlock);
   }, [pinnedPhoto, pinColor]);
 
   if (!MAPBOX_TOKEN) {
@@ -317,10 +315,17 @@ export function AlbumMiniMap({
         ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
         mapStyle={PREVIEW_MAP_STYLE}
-        initialViewState={{
-          longitude: ALBUM_SOUTH_CENTER[0],
-          latitude: ALBUM_SOUTH_CENTER[1],
-          zoom: ALBUM_OVERVIEW_ZOOM,
+        longitude={view.longitude}
+        latitude={view.latitude}
+        zoom={view.zoom}
+        onMove={(event) => {
+          if (lockOverview.current) return;
+          const next = event.viewState;
+          setView({
+            longitude: next.longitude,
+            latitude: next.latitude,
+            zoom: next.zoom,
+          });
         }}
         minZoom={4}
         maxZoom={Math.max(PIN_ZOOM, 15)}
@@ -357,7 +362,18 @@ export function AlbumMiniMap({
           const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
           applyAlbumPinView(map, pinned);
           if (pinned && pinnedRef.current) flyToPhoto(map, pinnedRef.current);
-          else jumpToSouthOverview(map);
+          else {
+            lockOverview.current = true;
+            jumpToSouthOverview(map);
+            setView({
+              longitude: ALBUM_SOUTH_CENTER[0],
+              latitude: ALBUM_SOUTH_CENTER[1],
+              zoom: ALBUM_OVERVIEW_ZOOM,
+            });
+            window.setTimeout(() => {
+              lockOverview.current = false;
+            }, 80);
+          }
           ready.current = true;
         }}
       />

@@ -11,7 +11,7 @@ import type { FeatureCollection, Point } from "geojson";
  */
 export const ALBUM_MINI_MAP_PX = 200;
 export const ALBUM_LAND_CELLS = 300;
-export const ALBUM_LAND_RADIUS = 0.55;
+export const ALBUM_LAND_RADIUS = 0.85;
 
 export function buildKoreaAlbumLandDots(): FeatureCollection<Point> {
   const bounds = KOREA_GRID_BOUNDS;
