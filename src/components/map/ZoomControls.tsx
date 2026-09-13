@@ -1,22 +1,21 @@
 "use client";
 
 import { useMap } from "@/context/map-context";
-import { MIN_MAP_ZOOM } from "@/lib/zoom";
 import { Minus, Plus } from "lucide-react";
 
 /**
  * 화면 왼쪽 가운데 +/- 그룹.
- * Mapbox `zoomIn` / `zoomOut` (300ms). 줌 5.4 에서는 − 를 끕니다.
+ * Mapbox `zoomIn` / `zoomOut` (300ms). 설정한 minZoom 에서는 − 를 끕니다.
  */
 export function ZoomControls() {
-  const { mapRef, mapZoom } = useMap();
-  const atMin = mapZoom <= MIN_MAP_ZOOM + 0.04;
+  const { mapRef, mapZoom, settings } = useMap();
+  const atMin = mapZoom <= settings.minZoom + 0.04;
 
   const zoomBy = (direction: "in" | "out") => {
     const map = mapRef.current?.getMap();
     if (!map) return;
     if (direction === "out") {
-      if (map.getZoom() <= MIN_MAP_ZOOM + 0.04) return;
+      if (map.getZoom() <= settings.minZoom + 0.04) return;
       map.zoomOut({ duration: 300 });
       return;
     }

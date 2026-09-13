@@ -17,6 +17,7 @@ export function filterPhotos(
   selectedCategories: Set<CategoryFilterKey>,
 ): Photo[] {
   return photos.filter((photo) => {
+    if (photo.hasGps === false) return false;
     if (photo.countryId !== countryId) return false;
     if (!matchesTime(photo, time)) return false;
     if (!matchesCategory(photo.category, selectedCategories)) return false;

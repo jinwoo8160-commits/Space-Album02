@@ -22,9 +22,13 @@ import {
   CLUSTER_ZOOM,
   COUNTRY_FIT_MAX_ZOOM,
   DEFAULT_MAP_ZOOM,
+  KOREA_HOME_CENTER,
+  MIN_MAP_ZOOM,
+  clampZoomSetting,
   overlayModeFromZoom,
   PIN_ZOOM,
 } from "@/lib/zoom";
+import type { MapBaseTheme } from "@/lib/map-theme";
 import type {
   CategoryColor,
   CategoryFilterKey,
@@ -45,6 +49,32 @@ import {
   type RefObject,
 } from "react";
 import type { MapRef } from "react-map-gl/mapbox";
+
+export type AppSettings = {
+  mapTheme: MapBaseTheme;
+  minZoom: number;
+  homeLng: number;
+  homeLat: number;
+  mapCacheReady: boolean;
+  pinLockEnabled: boolean;
+  biometricEnabled: boolean;
+  dailyAlert: boolean;
+  resultAlert: boolean;
+  statusAlert: boolean;
+};
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  mapTheme: "light",
+  minZoom: MIN_MAP_ZOOM,
+  homeLng: KOREA_HOME_CENTER[0],
+  homeLat: KOREA_HOME_CENTER[1],
+  mapCacheReady: false,
+  pinLockEnabled: false,
+  biometricEnabled: false,
+  dailyAlert: true,
+  resultAlert: true,
+  statusAlert: true,
+};
 
 type MapContextValue = {
   photos: Photo[];
@@ -77,6 +107,8 @@ type MapContextValue = {
   setPhotoCategory: (photoId: string, category: CategoryColor) => void;
   countryModalOpen: boolean;
   setCountryModalOpen: (open: boolean) => void;
+  settings: AppSettings;
+  updateSettings: (patch: Partial<AppSettings>) => void;
 };
 
 const MapContext = createContext<MapContextValue | null>(null);
@@ -105,6 +137,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [countryModalOpen, setCountryModalOpen] = useState(false);
   const [albumSort, setAlbumSort] = useState<AlbumSort>("desc");
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
 
   const overlayMode = overlayModeFromZoom(mapZoom);
 
@@ -209,6 +242,20 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const openPhoto = useCallback((id: string) => setSelectedPhotoId(id), []);
   const closePhoto = useCallback(() => setSelectedPhotoId(null), []);
 
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      if (patch.minZoom !== undefined) next.minZoom = clampZoomSetting(patch.minZoom);
+      if (patch.homeLng !== undefined) {
+        next.homeLng = Number.isFinite(patch.homeLng) ? patch.homeLng : prev.homeLng;
+      }
+      if (patch.homeLat !== undefined) {
+        next.homeLat = Number.isFinite(patch.homeLat) ? patch.homeLat : prev.homeLat;
+      }
+      return next;
+    });
+  }, []);
+
   const stepAlbumPhoto = useCallback(
     (delta: -1 | 1) => {
       setSelectedPhotoId((current) => {
@@ -252,6 +299,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setPhotoCategory,
     countryModalOpen,
     setCountryModalOpen,
+    settings,
+    updateSettings,
   };
 
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;

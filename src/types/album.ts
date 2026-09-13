@@ -61,6 +61,8 @@ export type Photo = {
   category: CategoryColor;
   /** ScenicPhoto 가 어떤 그림을 그릴지 결정하는 키 (외부 이미지 없이 동작) */
   scene: PhotoScene;
+  /** false 면 EXIF 위치가 없어 지도에는 올리지 않습니다. */
+  hasGps?: boolean;
 };
 
 export type PhotoScene =

@@ -15,10 +15,23 @@ export const DOT_ZOOM_THRESHOLD = DOT_MAX_ZOOM;
 
 export const DEFAULT_MAP_ZOOM = 5.4;
 export const MIN_MAP_ZOOM = 5.4;
+export const MIN_ZOOM_SETTING_MIN = 3;
+export const MIN_ZOOM_SETTING_MAX = 20;
 /** 줌 5.4 에서 남한 영토가 화면 정중앙에 오도록 맞춘 좌표. */
 export const KOREA_HOME_CENTER: [number, number] = [127.8, 35.8];
+/** minZoom 과 스냅 시작 사이의 기본 간격. */
+export const SNAP_BAND = 0.6;
 /** 이 줌 미만으로 들어가면 홈 좌표로 자석 보간을 시작합니다. */
-export const SNAP_START_ZOOM = 6.0;
+export const SNAP_START_ZOOM = MIN_MAP_ZOOM + SNAP_BAND;
+
+export function snapStartFromMin(minZoom: number) {
+  return Math.min(MIN_ZOOM_SETTING_MAX, Number((minZoom + SNAP_BAND).toFixed(2)));
+}
+
+export function clampZoomSetting(value: number) {
+  if (!Number.isFinite(value)) return MIN_MAP_ZOOM;
+  return Math.min(MIN_ZOOM_SETTING_MAX, Math.max(MIN_ZOOM_SETTING_MIN, value));
+}
 /**
  * 줌 5.4 에서 [127.8, 35.8]이 화면 정중앙에 올 수 있게 한반도 주변을 가둡니다.
  * 범위를 너무 좁히면 Mapbox 가 뷰포트(레티나 포함)에 맞춰 minZoom 을 5.4보다
@@ -31,25 +44,50 @@ export const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 /** zoom 6→5.4 구간에서 홈으로 끌어당기는 세기. 5.4에서 1. */
-export function koreaMagnetPull(zoom: number): number {
-  if (zoom >= SNAP_START_ZOOM) return 0;
-  if (zoom <= MIN_MAP_ZOOM) return 1;
-  const t = (SNAP_START_ZOOM - zoom) / (SNAP_START_ZOOM - MIN_MAP_ZOOM);
+export function koreaMagnetPull(
+  zoom: number,
+  minZoom = MIN_MAP_ZOOM,
+  snapStart = SNAP_START_ZOOM,
+): number {
+  if (zoom >= snapStart) return 0;
+  if (zoom <= minZoom) return 1;
+  const span = snapStart - minZoom;
+  if (span <= 0.0001) return 1;
+  const t = (snapStart - zoom) / span;
   return t * t;
 }
 
-export function magnetCenterTowardKorea(lng: number, lat: number, zoom: number): [number, number] {
-  const pull = koreaMagnetPull(zoom);
+export function magnetCenterTowardKorea(
+  lng: number,
+  lat: number,
+  zoom: number,
+  home: [number, number] = KOREA_HOME_CENTER,
+  minZoom = MIN_MAP_ZOOM,
+  snapStart = SNAP_START_ZOOM,
+): [number, number] {
+  const pull = koreaMagnetPull(zoom, minZoom, snapStart);
   if (pull <= 0) return [lng, lat];
-  if (pull >= 1) return KOREA_HOME_CENTER;
-  return [
-    lng + (KOREA_HOME_CENTER[0] - lng) * pull,
-    lat + (KOREA_HOME_CENTER[1] - lat) * pull,
-  ];
+  if (pull >= 1) return home;
+  return [lng + (home[0] - lng) * pull, lat + (home[1] - lat) * pull];
 }
 
-export function isKoreaMinZoom(zoom: number): boolean {
-  return zoom <= MIN_MAP_ZOOM + 0.04;
+export function isKoreaMinZoom(zoom: number, minZoom = MIN_MAP_ZOOM): boolean {
+  return zoom <= minZoom + 0.04;
+}
+
+/** minZoom 이 낮으면 한반도 가두기를 풀어 실제로 그 줌에 닿게 합니다. */
+export function maxBoundsForMinZoom(
+  minZoom: number,
+): [[number, number], [number, number]] {
+  if (minZoom >= 5.2) return KOREA_MAX_BOUNDS;
+  if (minZoom >= 4) return [
+    [100.0, 14.0],
+    [155.0, 52.0],
+  ];
+  return [
+    [-180, -85],
+    [180, 85],
+  ];
 }
 
 export type MapStage = "dots" | "detail";

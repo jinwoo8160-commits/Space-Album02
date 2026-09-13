@@ -183,7 +183,52 @@ const OVERSEAS: Photo[] = [
   },
 ];
 
-export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS];
+const UNLOCATED_PHOTOS: Photo[] = [
+  {
+    id: "p-nloc-1",
+    title: "위치 없는 스냅",
+    takenAt: "2025-08-12T14:20:00",
+    lat: 0,
+    lng: 0,
+    countryId: "kr",
+    provinceId: "other",
+    locationLabel: "위치 정보 없음",
+    districtLabel: "미지정",
+    category: null,
+    scene: "street",
+    hasGps: false,
+  },
+  {
+    id: "p-nloc-2",
+    title: "EXIF 없는 카페",
+    takenAt: "2025-03-04T11:05:00",
+    lat: 0,
+    lng: 0,
+    countryId: "kr",
+    provinceId: "other",
+    locationLabel: "위치 정보 없음",
+    districtLabel: "미지정",
+    category: "pink",
+    scene: "cafe",
+    hasGps: false,
+  },
+  {
+    id: "p-nloc-3",
+    title: "좌표 누락 노을",
+    takenAt: "2024-12-21T17:40:00",
+    lat: 0,
+    lng: 0,
+    countryId: "kr",
+    provinceId: "other",
+    locationLabel: "위치 정보 없음",
+    districtLabel: "미지정",
+    category: null,
+    scene: "sunset",
+    hasGps: false,
+  },
+];
+
+export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS, ...UNLOCATED_PHOTOS];
 
 export function latestPhotoYear(photos: Photo[] = MOCK_PHOTOS): number {
   return photos.reduce((max, photo) => {

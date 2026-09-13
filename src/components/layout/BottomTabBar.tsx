@@ -24,7 +24,10 @@ export function BottomTabBar() {
     <nav className="pointer-events-auto absolute inset-x-3 bottom-3.5 z-30 sm:inset-x-4 sm:bottom-4">
       <div className="flex items-center justify-around rounded-full bg-white px-2 py-3 shadow-[0_12px_40px_rgba(15,23,42,0.12)]">
         {TABS.map((tab) => {
-          const active = pathname === tab.href;
+          const active =
+            tab.href === "/"
+              ? pathname === "/"
+              : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           const Icon = tab.icon;
           return (
             <Link

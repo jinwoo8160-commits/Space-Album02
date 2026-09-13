@@ -13,10 +13,11 @@ import { OVERLAY_LABEL } from "@/lib/zoom";
  * 줌은 Mapbox 휠·핀치와 왼쪽 +/- 버튼이 함께 담당합니다.
  */
 export function MapScreen() {
-  const { overlayMode, mapZoom, filteredPhotos } = useMap();
+  const { overlayMode, mapZoom, filteredPhotos, settings } = useMap();
+  const dark = settings.mapTheme === "dark";
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col bg-white">
+    <section className={`relative flex min-h-0 flex-1 flex-col ${dark ? "bg-[#111]" : "bg-white"}`}>
       <div className="absolute inset-0">
         <AlbumMapDynamic />
       </div>
