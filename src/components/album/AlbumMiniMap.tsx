@@ -87,17 +87,28 @@ function jumpToSouthOverview(map: MapboxMap) {
 }
 
 function flyToSouthOverview(map: MapboxMap) {
-  map.flyTo({
+  map.stop();
+  map.easeTo({
     center: ALBUM_SOUTH_CENTER,
     zoom: ALBUM_OVERVIEW_ZOOM,
-    duration: 920,
+    duration: 800,
     essential: true,
     bearing: 0,
     pitch: 0,
   });
+  map.once("moveend", () => {
+    const center = map.getCenter();
+    const offZoom = Math.abs(map.getZoom() - ALBUM_OVERVIEW_ZOOM) > 0.2;
+    const offCenter =
+      Math.abs(center.lng - ALBUM_SOUTH_CENTER[0]) > 0.12 ||
+      Math.abs(center.lat - ALBUM_SOUTH_CENTER[1]) > 0.12;
+    if (offZoom || offCenter) jumpToSouthOverview(map);
+    map.triggerRepaint();
+  });
 }
 
 function flyToPhoto(map: MapboxMap, photo: Photo) {
+  map.stop();
   map.flyTo({
     center: [photo.lng, photo.lat],
     zoom: PIN_ZOOM,
@@ -272,12 +283,13 @@ export function AlbumMiniMap({
       map.setPaintProperty(PIN_LAYER, "circle-color", pinColor);
     }
     const pinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
+    map.stop();
     applyAlbumPinView(map, pinned);
-    if (pinned && pinnedPhoto) {
-      flyToPhoto(map, pinnedPhoto);
-      return;
-    }
-    flyToSouthOverview(map);
+    const frame = window.requestAnimationFrame(() => {
+      if (pinned && pinnedPhoto) flyToPhoto(map, pinnedPhoto);
+      else flyToSouthOverview(map);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [pinnedPhoto, pinColor]);
 
   if (!MAPBOX_TOKEN) {
