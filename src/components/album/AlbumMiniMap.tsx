@@ -2,6 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { KOREA_GRID_BOUNDS } from "@/data/korea-territory";
 import { ALBUM_LAND_RADIUS, KOREA_ALBUM_LAND_DOTS } from "@/lib/album-land";
 import { ALBUM_OVERVIEW_ZOOM } from "@/lib/album-period";
 import { CATEGORY_HEX, hexForCategory } from "@/lib/categories";
@@ -14,8 +15,8 @@ import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import { useEffect, useRef } from "react";
 import Map, { type MapRef } from "react-map-gl/mapbox";
 
-const LAND_SOURCE = "album-land-dots";
-const LAND_LAYER = "album-land-circles";
+const LAND_SOURCE = "album-land-dots-v2";
+const LAND_LAYER = "album-land-circles-v2";
 const PHOTO_SOURCE = "album-photo-dots";
 const PHOTO_LAYER = "album-photo-circles";
 const PIN_SOURCE = "album-pin-dot";
@@ -56,10 +57,26 @@ function pinCollection(photo: Photo | null): FeatureCollection<Point> {
   };
 }
 
+function jumpToKoreaOverview(map: MapboxMap) {
+  map.fitBounds(
+    [
+      [KOREA_GRID_BOUNDS.minLng, KOREA_GRID_BOUNDS.minLat],
+      [KOREA_GRID_BOUNDS.maxLng, KOREA_GRID_BOUNDS.maxLat],
+    ],
+    {
+      padding: { top: 10, bottom: 10, left: 44, right: 44 },
+      duration: 0,
+      maxZoom: ALBUM_OVERVIEW_ZOOM,
+    },
+  );
+}
+
 function ensureLayers(map: MapboxMap) {
   const empty: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
   if (!map.getSource(LAND_SOURCE)) {
     map.addSource(LAND_SOURCE, { type: "geojson", data: KOREA_ALBUM_LAND_DOTS });
+  } else {
+    (map.getSource(LAND_SOURCE) as GeoJSONSource).setData(KOREA_ALBUM_LAND_DOTS);
   }
   if (!map.getLayer(LAND_LAYER)) {
     map.addLayer({
@@ -70,9 +87,11 @@ function ensureLayers(map: MapboxMap) {
         "circle-radius": ALBUM_LAND_RADIUS,
         "circle-pitch-alignment": "viewport",
         "circle-color": "#c8c8c8",
-        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5.3, 0.95, 8, 0.2, 10, 0],
+        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 3.4, 1, 5.3, 0.96, 8, 0.2, 10, 0],
       },
     });
+  } else {
+    map.setPaintProperty(LAND_LAYER, "circle-radius", ALBUM_LAND_RADIUS);
   }
   if (!map.getSource(PHOTO_SOURCE)) {
     map.addSource(PHOTO_SOURCE, { type: "geojson", data: empty });
@@ -87,10 +106,12 @@ function ensureLayers(map: MapboxMap) {
           "interpolate",
           ["linear"],
           ["zoom"],
+          3.4,
+          Math.max(2.1, ALBUM_LAND_RADIUS * 1.85),
           5.3,
-          Math.max(1.4, ALBUM_LAND_RADIUS * 1.6),
+          Math.max(2.4, ALBUM_LAND_RADIUS * 2.1),
           9,
-          3.2,
+          3.4,
           12.6,
           6.5,
         ],
@@ -120,7 +141,7 @@ function ensureLayers(map: MapboxMap) {
 }
 
 /**
- * 앨범 중앙 한반도 미리보기. 기본 줌 5.3, 핀을 찍으면 지도 탭과 같은 확대 줌으로 갑니다.
+ * 앨범 중앙 한반도 미리보기. 영토에 맞춰 맞추고, 핀을 찍으면 지도 탭과 같은 확대 줌으로 갑니다.
  */
 export function AlbumMiniMap({
   photos,
@@ -164,7 +185,7 @@ export function AlbumMiniMap({
       });
       return;
     }
-    map.jumpTo({ center: KOREA_HOME_CENTER, zoom: ALBUM_OVERVIEW_ZOOM });
+    jumpToKoreaOverview(map);
   }, [pinnedPhoto, pinColor]);
 
   if (!MAPBOX_TOKEN) {
@@ -182,7 +203,7 @@ export function AlbumMiniMap({
           latitude: KOREA_HOME_CENTER[1],
           zoom: ALBUM_OVERVIEW_ZOOM,
         }}
-        minZoom={ALBUM_OVERVIEW_ZOOM}
+        minZoom={3.2}
         maxZoom={PIN_ZOOM}
         interactive={false}
         attributionControl={false}
@@ -200,12 +221,13 @@ export function AlbumMiniMap({
         style={{ width: "100%", height: "100%" }}
         onLoad={(event) => {
           const map = event.target;
+          map.resize();
           ensureLayers(map);
           (map.getSource(PHOTO_SOURCE) as GeoJSONSource).setData(
             photoCollection(photosRef.current, hexRef.current),
           );
           (map.getSource(PIN_SOURCE) as GeoJSONSource).setData(pinCollection(pinnedRef.current));
-          map.jumpTo({ center: KOREA_HOME_CENTER, zoom: ALBUM_OVERVIEW_ZOOM });
+          jumpToKoreaOverview(map);
           ready.current = true;
         }}
       />

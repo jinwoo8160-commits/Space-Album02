@@ -22,6 +22,7 @@ import {
 } from "@/lib/zoom";
 import type { MapLayerMouseEvent } from "mapbox-gl";
 import mapboxgl from "mapbox-gl";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
 
@@ -77,6 +78,7 @@ export function AlbumMap() {
     overlayMode,
     settings,
   } = useMap();
+  const onMapTab = usePathname() === "/";
 
   const [mapReady, setMapReady] = useState(false);
   const settleTimer = useRef<number | null>(null);
@@ -338,6 +340,17 @@ export function AlbumMap() {
     gridKeyRef.current = "";
     rebuildLandGrid(true);
   }, [filteredPhotos, selectedCountryId, selectedCategories, keyCategories, rebuildLandGrid]);
+
+  useEffect(() => {
+    if (!mapReady || !onMapTab) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    map.resize();
+    map.triggerRepaint();
+    gridKeyRef.current = "";
+    const timer = window.setTimeout(() => rebuildLandGrid(true), 80);
+    return () => window.clearTimeout(timer);
+  }, [onMapTab, mapReady, mapRef, rebuildLandGrid]);
 
   const handleMapClick = useCallback(
     (event: MapLayerMouseEvent) => {

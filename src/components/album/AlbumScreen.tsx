@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
-const AlbumMiniMap = dynamic(
+const AlbumMiniMapView = dynamic(
   () => import("@/components/album/AlbumMiniMap").then((mod) => mod.AlbumMiniMap),
   { ssr: false, loading: () => <div className="h-full w-full bg-white" /> },
 );
@@ -83,7 +83,7 @@ export function AlbumScreen() {
       </div>
 
       <div className="relative mt-2 shrink-0" style={{ height: ALBUM_MINI_MAP_PX }}>
-        <AlbumMiniMap
+        <AlbumMiniMapView
           photos={mapPhotos}
           pinnedPhoto={pinnedPhoto}
           pinColor={pinColor}
