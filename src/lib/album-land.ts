@@ -6,12 +6,12 @@ import {
 import type { FeatureCollection, Point } from "geojson";
 
 /**
- * 앨범 미니맵(200px, 남한 줌 4.35)용 세밀 격자.
- * 반지름을 작게 두고 칸을 촘촘히 잡아, 뭉친 면이 아니라 정갈한 점묘가 되게 합니다.
+ * 앨범 미니맵(200px, 남한 줌 4.1)용 세밀 격자.
+ * 위치 도트 `circle-radius` 는 2.3px 로 고정합니다.
  */
 export const ALBUM_MINI_MAP_PX = 200;
 export const ALBUM_LAND_CELLS = 280;
-export const ALBUM_LAND_RADIUS = 1.35;
+export const ALBUM_LAND_RADIUS = 2.3;
 
 export function buildKoreaAlbumLandDots(): FeatureCollection<Point> {
   const bounds = KOREA_GRID_BOUNDS;

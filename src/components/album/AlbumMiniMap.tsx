@@ -207,22 +207,14 @@ function ensureLayers(map: MapboxMap) {
       type: "circle",
       source: PHOTO_SOURCE,
       paint: {
-        "circle-radius": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          ALBUM_OVERVIEW_ZOOM,
-          1.15,
-          9,
-          2.8,
-          12.6,
-          5.5,
-        ],
+        "circle-radius": ALBUM_LAND_RADIUS,
         "circle-pitch-alignment": "viewport",
         "circle-color": ["coalesce", ["get", "color"], "#111111"],
         "circle-opacity": 0.92,
       },
     });
+  } else {
+    map.setPaintProperty(PHOTO_LAYER, "circle-radius", ALBUM_LAND_RADIUS);
   }
   if (!map.getSource(PIN_SOURCE)) {
     map.addSource(PIN_SOURCE, { type: "geojson", data: empty });

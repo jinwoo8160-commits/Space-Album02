@@ -2,16 +2,11 @@ import type { Photo } from "@/types/album";
 
 export type AlbumRange = "year" | "month" | "week" | "day";
 
-/** 남한 중심. 북한을 빼고 미니맵에 남한이 차게 보이게 합니다. */
+/** 남한 중심. 줌 4.1에서 남한이 미니맵 정중앙에 들어오게 고정합니다. */
 export const ALBUM_SOUTH_CENTER: [number, number] = [127.8, 36.3];
 
-/**
- * 200px 미니맵에서 남한(제주 포함)이 프레임을 채우는 줌.
- * 메인 지도의 5.4는 ~500px 기준이라, 같은 범위를 200px에 담으려면
- * 약 5.4 − log2(500/200) ≈ 4.1 이 필요합니다. 6.x 는 중부만 잘라 보여
- * 도트가 거의 안 보입니다.
- */
-export const ALBUM_OVERVIEW_ZOOM = 4.35;
+/** 앨범 미니맵 기본 카메라 줌. 남한(제주 포함)이 200px 프레임에 정갈하게 들어옵니다. */
+export const ALBUM_OVERVIEW_ZOOM = 4.1;
 
 export const ALBUM_RANGES: { id: AlbumRange; label: string }[] = [
   { id: "year", label: "년" },
