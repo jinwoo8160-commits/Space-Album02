@@ -2,6 +2,7 @@
 
 import { AlbumThumb } from "@/components/album/AlbumThumb";
 import { useMap } from "@/context/map-context";
+import { ALBUM_MINI_MAP_PX } from "@/lib/album-land";
 import {
   ALBUM_RANGES,
   formatPeriodLabel,
@@ -81,8 +82,13 @@ export function AlbumScreen() {
         </div>
       </div>
 
-      <div className="relative mt-2 h-[200px] shrink-0">
-        <AlbumMiniMap photos={mapPhotos} pinnedPhoto={pinnedPhoto} pinColor={pinColor} />
+      <div className="relative mt-2 shrink-0" style={{ height: ALBUM_MINI_MAP_PX }}>
+        <AlbumMiniMap
+          photos={mapPhotos}
+          pinnedPhoto={pinnedPhoto}
+          pinColor={pinColor}
+          hexById={hexById}
+        />
         <button
           type="button"
           aria-label="이전 기간"
