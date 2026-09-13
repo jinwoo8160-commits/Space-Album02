@@ -1,7 +1,5 @@
-"use client";
-
-import { RecordsScreen } from "@/components/records/RecordsScreen";
+import { RecordEmpty } from "@/components/records/RecordEmpty";
 
 export default function RecordsPage() {
-  return <RecordsScreen />;
+  return <RecordEmpty />;
 }

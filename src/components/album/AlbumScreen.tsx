@@ -6,7 +6,10 @@ import { groupPhotosByMonth } from "@/lib/album";
 import { hexByCategoryList, hexForCategory } from "@/lib/categories";
 import { useMemo } from "react";
 
-export function RecordsScreen() {
+/**
+ * 하단 앨범 탭. 촬영 날짜 연대기 그리드입니다.
+ */
+export function AlbumScreen() {
   const { albumPhotos, albumSort, setAlbumSort, openPhoto, keyCategories } = useMap();
   const groups = useMemo(() => groupPhotosByMonth(albumPhotos), [albumPhotos]);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
@@ -16,7 +19,7 @@ export function RecordsScreen() {
       <header className="flex items-end justify-between px-5 pt-5 pb-3">
         <div>
           <h1 className="font-[family-name:var(--font-hand)] text-2xl leading-none text-neutral-900">
-            기록
+            앨범
           </h1>
           <p className="pt-1 text-[12px] text-neutral-500">촬영 날짜 순 · {albumPhotos.length}장</p>
         </div>

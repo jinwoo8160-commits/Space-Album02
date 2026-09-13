@@ -11,8 +11,8 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * 지도 핀·기록 그리드가 같이 쓰는 상세 모달.
- * 이전/다음 넘기기는 기록 탭에서만 화살표·키보드·스와이프로 동작합니다.
+ * 지도 핀·앨범 그리드가 같이 쓰는 상세 모달.
+ * 이전/다음 넘기기는 앨범 탭에서만 화살표·키보드·스와이프로 동작합니다.
  */
 export function PhotoDetailModal() {
   const {
@@ -26,11 +26,16 @@ export function PhotoDetailModal() {
     albumCount,
   } = useMap();
   const pathname = usePathname();
-  const canBrowseAlbum = pathname === "/records";
+  const canBrowseAlbum = pathname === "/album";
   const [slide, setSlide] = useState<"next" | "prev" | "in">("in");
   const [addOpen, setAddOpen] = useState(false);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    closePhoto();
+    setAddOpen(false);
+  }, [closePhoto, pathname]);
 
   const go = useCallback(
     (delta: -1 | 1) => {
