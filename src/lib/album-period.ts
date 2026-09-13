@@ -2,11 +2,11 @@ import type { Photo } from "@/types/album";
 
 export type AlbumRange = "year" | "month" | "week" | "day";
 
-/** 남한 중심. 줌 4.1에서 남한이 미니맵 정중앙에 들어오게 고정합니다. */
+/** 남한 중심. 줌 4.15에서 남한이 미니맵 정중앙에 들어오게 고정합니다. */
 export const ALBUM_SOUTH_CENTER: [number, number] = [127.8, 36.3];
 
 /** 앨범 미니맵 기본 카메라 줌. 남한(제주 포함)이 200px 프레임에 정갈하게 들어옵니다. */
-export const ALBUM_OVERVIEW_ZOOM = 4.1;
+export const ALBUM_OVERVIEW_ZOOM = 4.15;
 
 export const ALBUM_RANGES: { id: AlbumRange; label: string }[] = [
   { id: "year", label: "년" },
