@@ -5,7 +5,8 @@ import type { CategoryColor, Photo, PhotoScene, ProvinceId } from "@/types/album
  *
  * 서울·수도권에 몰아 넣어 국가 줌에서 북서가 1단계(가장 짙음)가 되고,
  * 부산이 그다음, 제주·강원·소도시는 1~2장씩 흩어져 3~4단계가 됩니다.
- * 기본 연도 필터(최신 연도)에도 밀도가 보이도록 2025 장을 많이 둡니다.
+ * 기본 연도 필터(최신 연도)와 앨범 기본 월(2026년 9월)에도 밀도가 보이도록
+ * 2026년 장을 많이 둡니다.
  */
 
 type Hub = {
@@ -115,9 +116,10 @@ function buildKoreaPhotos(): Photo[] {
       const exact = Boolean(hub.pinExactFirst && i < 2);
       const latJ = exact ? 0 : (unit(index * 3.1) - 0.5) * 2 * hub.jitter;
       const lngJ = exact ? 0 : (unit(index * 7.7) - 0.5) * 2 * hub.jitter;
-      const year = index % 10 < 7 ? 2025 : index % 10 < 9 ? 2024 : 2023;
-      const month = 1 + Math.floor(unit(index * 1.7) * 12);
-      const day = 1 + Math.floor(unit(index * 4.3) * 27);
+      const year = index <= 42 ? 2026 : index <= 62 ? 2025 : index <= 80 ? 2024 : 2023;
+      const month =
+        index <= 42 ? 9 : index <= 50 ? 8 : index <= 56 ? 10 : 1 + Math.floor(unit(index * 1.7) * 12);
+      const day = index <= 42 ? 1 + (index % 28) : 1 + Math.floor(unit(index * 4.3) * 27);
       const hour = 8 + Math.floor(unit(index * 9.1) * 14);
 
       photos.push({
