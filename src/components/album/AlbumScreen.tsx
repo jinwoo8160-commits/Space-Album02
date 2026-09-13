@@ -1,6 +1,6 @@
 "use client";
 
-import { ScenicPhoto } from "@/components/map/ScenicPhoto";
+import { AlbumThumb } from "@/components/album/AlbumThumb";
 import { useMap } from "@/context/map-context";
 import {
   ALBUM_RANGES,
@@ -21,13 +21,15 @@ const AlbumMiniMap = dynamic(
   { ssr: false, loading: () => <div className="h-full w-full bg-white" /> },
 );
 
+const DEFAULT_CURSOR = new Date(2026, 8, 13);
+
 /**
- * 앨범 탭. 년/월/주/일로 기간을 고르고, 한반도 미니 지도와 사진 그리드를 같이 보여 줍니다.
+ * 앨범 탭. 년/월/주/일, 한반도 미니 지도, 5열 사진 그리드.
  */
 export function AlbumScreen() {
   const { photos, openPhoto, keyCategories } = useMap();
   const [range, setRange] = useState<AlbumRange>("month");
-  const [cursor, setCursor] = useState(() => new Date());
+  const [cursor, setCursor] = useState(() => DEFAULT_CURSOR);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
 
@@ -52,10 +54,14 @@ export function AlbumScreen() {
     setCursor((prev) => shiftPeriod(prev, range, delta));
   };
 
+  const togglePin = (photoId: string) => {
+    setPinnedId((current) => (current === photoId ? null : photoId));
+  };
+
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-white">
-      <div className="px-5 pt-4">
-        <div className="flex rounded-full bg-neutral-200/80 p-1">
+      <div className="px-4 pt-4">
+        <div className="flex rounded-full bg-[#ececee] p-1">
           {ALBUM_RANGES.map((item) => {
             const active = range === item.id;
             return (
@@ -64,8 +70,8 @@ export function AlbumScreen() {
                 type="button"
                 onClick={() => selectRange(item.id)}
                 className={cn(
-                  "h-9 flex-1 rounded-full text-[15px] font-medium",
-                  active ? "bg-neutral-900 text-white" : "text-neutral-400",
+                  "h-10 flex-1 rounded-full text-[15px] font-medium",
+                  active ? "bg-neutral-900 text-white shadow-sm" : "text-neutral-400",
                 )}
               >
                 {item.label}
@@ -75,32 +81,32 @@ export function AlbumScreen() {
         </div>
       </div>
 
-      <div className="relative mt-3 h-[210px] shrink-0">
+      <div className="relative mt-2 h-[200px] shrink-0">
         <AlbumMiniMap photos={mapPhotos} pinnedPhoto={pinnedPhoto} pinColor={pinColor} />
         <button
           type="button"
           aria-label="이전 기간"
           onClick={() => step(-1)}
-          className="absolute top-1/2 left-3 z-10 flex size-10 -translate-y-1/2 items-center justify-center text-neutral-400"
+          className="absolute top-1/2 left-1 z-10 flex size-11 -translate-y-1/2 items-center justify-center text-neutral-300"
         >
-          <ChevronLeft className="size-8" strokeWidth={1.7} />
+          <ChevronLeft className="size-9" strokeWidth={1.6} />
         </button>
         <button
           type="button"
           aria-label="다음 기간"
           onClick={() => step(1)}
-          className="absolute top-1/2 right-3 z-10 flex size-10 -translate-y-1/2 items-center justify-center text-neutral-400"
+          className="absolute top-1/2 right-1 z-10 flex size-11 -translate-y-1/2 items-center justify-center text-neutral-300"
         >
-          <ChevronRight className="size-8" strokeWidth={1.7} />
+          <ChevronRight className="size-9" strokeWidth={1.6} />
         </button>
       </div>
 
-      <p className="py-3 text-center text-[16px] font-medium text-neutral-800">
+      <p className="py-2.5 text-center text-[16px] font-medium text-neutral-800">
         {formatPeriodLabel(range, cursor)}
       </p>
 
       {periodPhotos.length === 0 ? (
-        <p className="flex flex-1 items-start justify-center px-8 pt-10 text-center text-[14px] leading-relaxed text-neutral-400">
+        <p className="flex flex-1 items-start justify-center px-8 pt-12 text-center text-[14px] leading-relaxed text-neutral-400">
           이 기간에 등록된 추억이 없습니다.
         </p>
       ) : (
@@ -115,10 +121,10 @@ export function AlbumScreen() {
                   key={photo.id}
                   type="button"
                   onClick={() => openPhoto(photo.id)}
-                  className="relative aspect-square overflow-hidden rounded-[14px] bg-neutral-100"
+                  className="relative aspect-square overflow-hidden rounded-2xl bg-neutral-100"
                   aria-label={photo.title}
                 >
-                  <ScenicPhoto scene={photo.scene} className="h-full w-full" />
+                  <AlbumThumb scene={photo.scene} className="h-full w-full" />
                   {canPin && hex ? (
                     <span
                       role="button"
@@ -127,21 +133,25 @@ export function AlbumScreen() {
                       aria-pressed={pinned}
                       onClick={(event) => {
                         event.stopPropagation();
-                        setPinnedId((current) => (current === photo.id ? null : photo.id));
+                        togglePin(photo.id);
                       }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           event.stopPropagation();
-                          setPinnedId((current) => (current === photo.id ? null : photo.id));
+                          togglePin(photo.id);
                         }
                       }}
-                      className={cn(
-                        "absolute bottom-1 left-1 size-2.5 rounded-full ring-2",
-                        pinned ? "ring-neutral-900" : "ring-white/95",
-                      )}
-                      style={{ backgroundColor: hex }}
-                    />
+                      className="absolute bottom-0 left-0 flex size-7 items-end justify-start p-1"
+                    >
+                      <span
+                        className={cn(
+                          "size-2.5 rounded-full ring-2",
+                          pinned ? "ring-neutral-900" : "ring-white",
+                        )}
+                        style={{ backgroundColor: hex }}
+                      />
+                    </span>
                   ) : null}
                 </button>
               );

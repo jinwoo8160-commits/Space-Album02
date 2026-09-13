@@ -2,15 +2,10 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { buildKoreaAlbumLandDots } from "@/lib/album-land";
 import { ALBUM_OVERVIEW_ZOOM } from "@/lib/album-period";
-import {
-  applyPreviewCountryFilter,
-  buildPreviewDotGrid,
-  PREVIEW_DOT_LAYER,
-  PREVIEW_DOT_SOURCE,
-  PREVIEW_MAP_STYLE,
-} from "@/lib/preview-dots";
 import { MAPBOX_TOKEN } from "@/lib/map-style";
+import { PREVIEW_MAP_STYLE } from "@/lib/preview-dots";
 import { KOREA_HOME_CENTER, PIN_ZOOM } from "@/lib/zoom";
 import type { Photo } from "@/types/album";
 import type { FeatureCollection, Point } from "geojson";
@@ -18,6 +13,8 @@ import type { GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import { useEffect, useRef } from "react";
 import Map, { type MapRef } from "react-map-gl/mapbox";
 
+const LAND_SOURCE = "album-land-dots";
+const LAND_LAYER = "album-land-circles";
 const PHOTO_SOURCE = "album-photo-dots";
 const PHOTO_LAYER = "album-photo-circles";
 const PIN_SOURCE = "album-pin-dot";
@@ -30,7 +27,6 @@ function photoCollection(photos: Photo[]): FeatureCollection<Point> {
       .filter((photo) => photo.hasGps !== false)
       .map((photo) => ({
         type: "Feature",
-        id: photo.id,
         properties: { id: photo.id },
         geometry: { type: "Point", coordinates: [photo.lng, photo.lat] },
       })),
@@ -54,28 +50,25 @@ function pinCollection(photo: Photo | null): FeatureCollection<Point> {
 }
 
 function ensureLayers(map: MapboxMap) {
-  applyPreviewCountryFilter(map, "kr");
-  if (!map.getSource(PREVIEW_DOT_SOURCE)) {
-    map.addSource(PREVIEW_DOT_SOURCE, {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] },
-    });
+  const empty: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
+  if (!map.getSource(LAND_SOURCE)) {
+    map.addSource(LAND_SOURCE, { type: "geojson", data: buildKoreaAlbumLandDots() });
   }
-  if (!map.getLayer(PREVIEW_DOT_LAYER)) {
+  if (!map.getLayer(LAND_LAYER)) {
     map.addLayer({
-      id: PREVIEW_DOT_LAYER,
+      id: LAND_LAYER,
       type: "circle",
-      source: PREVIEW_DOT_SOURCE,
+      source: LAND_SOURCE,
       paint: {
-        "circle-radius": 1.25,
+        "circle-radius": 1.35,
         "circle-pitch-alignment": "viewport",
-        "circle-color": "#c4c4c4",
-        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5.3, 0.9, 8, 0.25, 10, 0],
+        "circle-color": "#c8c8c8",
+        "circle-opacity": ["interpolate", ["linear"], ["zoom"], 5.3, 0.95, 8, 0.2, 10, 0],
       },
     });
   }
   if (!map.getSource(PHOTO_SOURCE)) {
-    map.addSource(PHOTO_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addSource(PHOTO_SOURCE, { type: "geojson", data: empty });
   }
   if (!map.getLayer(PHOTO_LAYER)) {
     map.addLayer({
@@ -83,7 +76,7 @@ function ensureLayers(map: MapboxMap) {
       type: "circle",
       source: PHOTO_SOURCE,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.3, 2.35, 9, 4, 12.6, 7],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.3, 2.2, 9, 4, 12.6, 7],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
         "circle-opacity": 0.92,
@@ -91,7 +84,7 @@ function ensureLayers(map: MapboxMap) {
     });
   }
   if (!map.getSource(PIN_SOURCE)) {
-    map.addSource(PIN_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addSource(PIN_SOURCE, { type: "geojson", data: empty });
   }
   if (!map.getLayer(PIN_LAYER)) {
     map.addLayer({
@@ -99,7 +92,7 @@ function ensureLayers(map: MapboxMap) {
       type: "circle",
       source: PIN_SOURCE,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.3, 3.2, 12.6, 9],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.3, 3.4, 12.6, 9],
         "circle-pitch-alignment": "viewport",
         "circle-color": "#111111",
         "circle-stroke-width": 2,
@@ -110,8 +103,7 @@ function ensureLayers(map: MapboxMap) {
 }
 
 /**
- * 앨범 탭 중앙 한반도 미니 지도.
- * 기본 줌 5.3, 핀을 누르면 지도 탭과 같은 사진 확대 줌으로 이동합니다.
+ * 앨범 중앙 한반도 미리보기. 기본 줌 5.3, 핀을 찍으면 지도 탭과 같은 확대 줌으로 갑니다.
  */
 export function AlbumMiniMap({
   photos,
@@ -125,7 +117,7 @@ export function AlbumMiniMap({
   const mapRef = useRef<MapRef | null>(null);
   const photosRef = useRef(photos);
   const pinnedRef = useRef(pinnedPhoto);
-  const cameraReady = useRef(false);
+  const ready = useRef(false);
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
@@ -137,12 +129,11 @@ export function AlbumMiniMap({
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
-    if (!map?.getSource(PIN_SOURCE)) return;
+    if (!map?.getSource(PIN_SOURCE) || !ready.current) return;
     (map.getSource(PIN_SOURCE) as GeoJSONSource).setData(pinCollection(pinnedPhoto));
     if (pinColor && map.getLayer(PIN_LAYER)) {
       map.setPaintProperty(PIN_LAYER, "circle-color", pinColor);
     }
-    if (!map.isStyleLoaded() || !cameraReady.current) return;
     if (pinnedPhoto && pinnedPhoto.hasGps !== false) {
       map.easeTo({
         center: [pinnedPhoto.lng, pinnedPhoto.lat],
@@ -152,12 +143,7 @@ export function AlbumMiniMap({
       });
       return;
     }
-    map.easeTo({
-      center: KOREA_HOME_CENTER,
-      zoom: ALBUM_OVERVIEW_ZOOM,
-      duration: 520,
-      essential: true,
-    });
+    map.jumpTo({ center: KOREA_HOME_CENTER, zoom: ALBUM_OVERVIEW_ZOOM });
   }, [pinnedPhoto, pinColor]);
 
   if (!MAPBOX_TOKEN) {
@@ -165,7 +151,7 @@ export function AlbumMiniMap({
   }
 
   return (
-    <div className="h-full w-full overflow-hidden bg-white">
+    <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
       <Map
         ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -194,24 +180,10 @@ export function AlbumMiniMap({
         onLoad={(event) => {
           const map = event.target;
           ensureLayers(map);
-          (map.getSource(PHOTO_SOURCE) as GeoJSONSource | undefined)?.setData(
-            photoCollection(photosRef.current),
-          );
-          (map.getSource(PIN_SOURCE) as GeoJSONSource | undefined)?.setData(
-            pinCollection(pinnedRef.current),
-          );
+          (map.getSource(PHOTO_SOURCE) as GeoJSONSource).setData(photoCollection(photosRef.current));
+          (map.getSource(PIN_SOURCE) as GeoJSONSource).setData(pinCollection(pinnedRef.current));
           map.jumpTo({ center: KOREA_HOME_CENTER, zoom: ALBUM_OVERVIEW_ZOOM });
-          cameraReady.current = true;
-          const paintLand = () => {
-            const data = buildPreviewDotGrid(map, "kr");
-            if (data.features.length === 0) return false;
-            (map.getSource(PREVIEW_DOT_SOURCE) as GeoJSONSource | undefined)?.setData(data);
-            return true;
-          };
-          map.once("idle", () => {
-            if (paintLand()) return;
-            map.once("idle", paintLand);
-          });
+          ready.current = true;
         }}
       />
     </div>
