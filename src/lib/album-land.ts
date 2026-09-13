@@ -3,29 +3,15 @@ import {
   KOREA_GRID_BOUNDS,
   KOREA_ISLAND_SEEDS,
 } from "@/data/korea-territory";
-import { DOT_RADIUS_PX } from "@/lib/land-dots";
 import type { FeatureCollection, Point } from "geojson";
 
 /**
- * 메인 지도는 폰 프레임(~844px) 안에서 거의 전체 높이를 씁니다.
- * 앨범 미니맵은 높이 200px 이라 같은 지리적 피치면 윤곽이 끊깁니다.
+ * 앨범 미니맵(200px, 남한 줌 ~4.45)용 세밀 격자.
+ * 반지름을 작게 두고 칸을 촘촘히 잡아, 뭉친 면이 아니라 정갈한 점묘가 되게 합니다.
  */
-export const MAIN_MAP_REF_PX = 640;
 export const ALBUM_MINI_MAP_PX = 200;
-export const ALBUM_TO_MAIN_SCALE = ALBUM_MINI_MAP_PX / MAIN_MAP_REF_PX;
-
-const MAIN_GRID_CELLS = 130;
-
-/**
- * 축소 비율만큼 격자 칸을 늘리고, 반지름은 비율대로 줄이되
- * 1px 미만이면 래스터에서 점이 사라져 성기게 보이므로 바닥을 둡니다.
- * 작은 캔버스에서는 채움 비율을 조금 더 높여 한반도 윤곽이 이어지게 합니다.
- */
-export const ALBUM_LAND_CELLS = Math.round(MAIN_GRID_CELLS / ALBUM_TO_MAIN_SCALE);
-export const ALBUM_LAND_RADIUS = Math.max(
-  1.15,
-  Number((DOT_RADIUS_PX * ALBUM_TO_MAIN_SCALE).toFixed(2)),
-);
+export const ALBUM_LAND_CELLS = 300;
+export const ALBUM_LAND_RADIUS = 0.55;
 
 export function buildKoreaAlbumLandDots(): FeatureCollection<Point> {
   const bounds = KOREA_GRID_BOUNDS;
