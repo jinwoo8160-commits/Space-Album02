@@ -111,8 +111,8 @@ export function RecordScreen() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[5.75rem] pt-2">
-        <div ref={captureRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden pb-[5.75rem]">
+        <div ref={captureRef} className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
           <JournalTimeline onPickPhoto={setPickCourseId} />
         </div>
       </div>
