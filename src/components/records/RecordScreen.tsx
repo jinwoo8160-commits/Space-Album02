@@ -70,7 +70,7 @@ export function RecordScreen() {
   };
 
   return (
-    <section className="relative flex min-h-0 flex-1 flex-col bg-white">
+    <section className="relative flex h-full max-h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-4 pt-4">
         <div className="pointer-events-auto min-w-[72px]">
           {editing ? (
@@ -111,11 +111,9 @@ export function RecordScreen() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-24 pt-4">
-        <div ref={captureRef} className="flex min-h-full items-center justify-center bg-white">
-          <div className="w-full">
-            <JournalTimeline onPickPhoto={setPickCourseId} />
-          </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[5.75rem] pt-2">
+        <div ref={captureRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+          <JournalTimeline onPickPhoto={setPickCourseId} />
         </div>
       </div>
 

@@ -27,7 +27,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Image as ImageIcon, Minus, Plus } from "lucide-react";
-import { useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  Fragment,
+  useMemo,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+
+/** Course widget chrome: 68px photo + 12px vertical padding. Never shrink. */
+const COURSE_ROW_PX = 80;
+const PLUS_BTN_PX = 44;
 
 const LONG_PRESS_MS = 520;
 
@@ -172,12 +181,13 @@ function SortableCourse({
     <div
       ref={sortable.setNodeRef}
       style={style}
-      className={cn("relative px-5", sortable.isDragging && "opacity-90")}
+      className={cn("relative shrink-0 px-5", sortable.isDragging && "opacity-90")}
       {...(editing ? { ...sortable.attributes, ...sortable.listeners } : {})}
     >
       <div
         {...(!editing ? bind : {})}
-        className="relative mx-auto flex w-full max-w-[340px] items-center justify-between gap-2 py-1.5"
+        className="relative mx-auto flex w-full max-w-[340px] shrink-0 items-center justify-between gap-2 py-1.5"
+        style={{ height: COURSE_ROW_PX }}
       >
         <WidgetOutline
           show={editing}
@@ -194,7 +204,9 @@ function SortableCourse({
             />
           </div>
         </div>
-        <div className="w-8 shrink-0" />
+        <div className="relative w-8 shrink-0">
+          <span className="absolute top-1/2 left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-900" />
+        </div>
         <div className="flex min-w-0 flex-1 justify-start">
           <PhotoSlot photo={photo ?? null} hex={hex} editing={editing} onOpen={onPhoto} />
         </div>
@@ -230,9 +242,7 @@ export function JournalTimeline({
 
   const photoById = useMemo(() => new Map(photos.map((photo) => [photo.id, photo])), [photos]);
   const count = draft.courses.length;
-  const rowPx = 92;
-  const lineTop = 8;
-  const lineHeight = Math.max(24, (count - 1) * rowPx + 36);
+  const showPlus = canAddCourse(draft.courses);
 
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -246,12 +256,12 @@ export function JournalTimeline({
   };
 
   return (
-    <div className="flex flex-col items-center px-2 pb-8 pt-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden px-2 pt-12 pb-1">
       {editing && !draft.subtitleVisible ? (
         <button
           type="button"
           aria-label="부제 추가"
-          className="mb-4 flex size-10 items-center justify-center rounded-[12px] border border-neutral-800"
+          className="mb-3 flex size-10 shrink-0 items-center justify-center rounded-[12px] border border-neutral-800"
           onClick={() => setDraft((prev) => ({ ...prev, subtitleVisible: true, subtitle: "" }))}
         >
           <Plus className="size-5" strokeWidth={1.8} />
@@ -259,7 +269,7 @@ export function JournalTimeline({
       ) : null}
 
       {draft.subtitleVisible ? (
-        <div className="relative mb-2.5 w-full max-w-[260px]" {...(!editing ? bind : {})}>
+        <div className="relative mb-2 w-full max-w-[260px] shrink-0 self-center" {...(!editing ? bind : {})}>
           <WidgetOutline
             show={editing}
             className="-inset-x-3 -inset-y-2 rounded-[28px]"
@@ -286,7 +296,7 @@ export function JournalTimeline({
         </div>
       ) : null}
 
-      <div className="relative mb-4 w-full max-w-[300px]" {...(!editing ? bind : {})}>
+      <div className="relative mb-2 w-full max-w-[300px] shrink-0 self-center" {...(!editing ? bind : {})}>
         <div className="box-border flex h-10 w-full items-center justify-center rounded-[22px] border border-neutral-800 px-4">
           <HintField
             value={draft.title}
@@ -301,18 +311,14 @@ export function JournalTimeline({
         </div>
       </div>
 
-      <div className="relative w-full">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden">
         <div
           className="pointer-events-none absolute left-1/2 z-0 w-px -translate-x-1/2 bg-neutral-900"
-          style={{ top: lineTop, height: lineHeight }}
+          style={{
+            top: COURSE_ROW_PX / 2,
+            bottom: showPlus ? PLUS_BTN_PX / 2 : COURSE_ROW_PX / 2,
+          }}
         />
-        {draft.courses.map((_, index) => (
-          <span
-            key={`dot-${index}`}
-            className="pointer-events-none absolute left-1/2 z-[1] size-2.5 -translate-x-1/2 rounded-full bg-neutral-900"
-            style={{ top: lineTop + index * rowPx + 34 }}
-          />
-        ))}
 
         <DndContext
           sensors={sensors}
@@ -321,13 +327,16 @@ export function JournalTimeline({
           onDragEnd={onDragEnd}
         >
           <SortableContext items={draft.courses.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-            <div className="relative z-[2] flex flex-col" style={{ gap: 0 }}>
-              {draft.courses.map((course) => {
+            <div className="relative z-[2] flex min-h-0 flex-1 flex-col">
+              {draft.courses.map((course, index) => {
                 const photo = course.photoId ? photoById.get(course.photoId) : undefined;
                 const hex = photo?.category ? hexForCategory(photo.category, hexById) : null;
                 return (
-                  <div key={course.id} style={{ height: rowPx }} className="flex items-center">
-                    <div className="w-full">
+                  <Fragment key={course.id}>
+                    {index > 0 ? (
+                      <div className="min-h-[2px] flex-1 basis-0" aria-hidden />
+                    ) : null}
+                    <div className="shrink-0">
                       <SortableCourse
                         course={course}
                         photo={photo}
@@ -354,31 +363,37 @@ export function JournalTimeline({
                         }}
                       />
                     </div>
-                  </div>
+                  </Fragment>
                 );
               })}
+              {showPlus ? (
+                <>
+                  <div className="min-h-[2px] flex-1 basis-0" aria-hidden />
+                  <div
+                    className="relative z-[2] flex shrink-0 justify-center"
+                    style={{ height: PLUS_BTN_PX }}
+                  >
+                    <button
+                      type="button"
+                      aria-label="코스 추가"
+                      className="flex size-11 items-center justify-center rounded-[14px] border border-neutral-800 bg-white"
+                      onClick={() => {
+                        setDraft((prev) =>
+                          canAddCourse(prev.courses)
+                            ? { ...prev, courses: [...prev.courses, emptyCourse()] }
+                            : prev,
+                        );
+                      }}
+                    >
+                      <Plus className="size-6" strokeWidth={1.7} />
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
           </SortableContext>
         </DndContext>
-
-        {canAddCourse(draft.courses) ? (
-          <div className="relative z-[2] mt-1 flex justify-center">
-            <button
-              type="button"
-              aria-label="코스 추가"
-              className="flex size-11 items-center justify-center rounded-[14px] border border-neutral-800 bg-white"
-              onClick={() => {
-                setDraft((prev) =>
-                  canAddCourse(prev.courses) ? { ...prev, courses: [...prev.courses, emptyCourse()] } : prev,
-                );
-              }}
-            >
-              <Plus className="size-6" strokeWidth={1.7} />
-            </button>
-          </div>
-        ) : null}
       </div>
-
     </div>
   );
 }
