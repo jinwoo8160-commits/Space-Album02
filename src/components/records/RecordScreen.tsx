@@ -4,29 +4,12 @@ import { AlbumPickModal } from "@/components/records/AlbumPickModal";
 import { JournalTimeline } from "@/components/records/JournalTimeline";
 import { RecordAlert, RecordToast } from "@/components/records/RecordFeedback";
 import { useJournal } from "@/context/journal-context";
-import { objectParticle } from "@/lib/korean";
+import { journalShareBlocker } from "@/lib/journal";
 import { cn } from "@/lib/utils";
 import type { Photo } from "@/types/album";
 import { toPng } from "html-to-image";
 import { LayoutGrid, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-
-function missingMessage(draft: {
-  title: string;
-  subtitle: string;
-  subtitleVisible: boolean;
-  courses: { placeName: string; photoId: string | null }[];
-}) {
-  if (draft.subtitleVisible && !draft.subtitle.trim()) {
-    return `부제${objectParticle("부제")} 입력해 주세요`;
-  }
-  if (!draft.title.trim()) return `제목${objectParticle("제목")} 입력해 주세요`;
-  if (draft.courses.some((item) => !item.placeName.trim())) {
-    return `장소명${objectParticle("장소명")} 입력해 주세요`;
-  }
-  if (draft.courses.some((item) => !item.photoId)) return "사진을 업로드해 주세요";
-  return null;
-}
 
 export function RecordScreen() {
   const { draft, setDraft, editing, setEditing } = useJournal();
@@ -45,7 +28,6 @@ export function RecordScreen() {
           ? {
               ...item,
               photoId: photo.id,
-              placeName: item.placeName.trim() ? item.placeName : photo.districtLabel || photo.locationLabel,
             }
           : item,
       ),
@@ -55,7 +37,7 @@ export function RecordScreen() {
 
   const share = async () => {
     if (editing || sharing.current) return;
-    const missing = missingMessage(draft);
+    const missing = journalShareBlocker(draft);
     if (missing) {
       setAlert(missing);
       return;
