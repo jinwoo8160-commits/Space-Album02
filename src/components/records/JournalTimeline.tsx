@@ -61,8 +61,14 @@ function useEnterEdit() {
   };
 }
 
-function boxStroke(editing: boolean) {
-  return editing ? "border-neutral-800" : "border-transparent";
+function WidgetOutline({ show, className }: { show: boolean; className?: string }) {
+  if (!show) return null;
+  return (
+    <div
+      aria-hidden
+      className={cn("pointer-events-none absolute border border-neutral-800", className)}
+    />
+  );
 }
 
 function HintField({
@@ -171,18 +177,14 @@ function SortableCourse({
     >
       <div
         {...(!editing ? bind : {})}
-        className={cn(
-          "relative mx-auto box-border flex w-full max-w-[340px] items-center justify-between gap-2 rounded-[24px] border px-2.5 py-2",
-          boxStroke(editing),
-        )}
+        className="relative mx-auto flex w-full max-w-[340px] items-center justify-between gap-2 py-1.5"
       >
+        <WidgetOutline
+          show={editing}
+          className="-inset-x-2 inset-y-0 rounded-[24px]"
+        />
         <div className="flex min-w-0 flex-1 justify-end">
-          <div
-            className={cn(
-              "box-border flex h-7 w-[10.75rem] items-center justify-center rounded-full border px-3",
-              boxStroke(editing),
-            )}
-          >
+          <div className="box-border flex h-7 w-[10.75rem] items-center justify-center rounded-full border border-neutral-800 px-3">
             <HintField
               value={course.placeName}
               hint="장소명을 입력하세요"
@@ -258,12 +260,11 @@ export function JournalTimeline({
 
       {draft.subtitleVisible ? (
         <div className="relative mb-2.5 w-full max-w-[260px]" {...(!editing ? bind : {})}>
-          <div
-            className={cn(
-              "box-border flex h-7 w-full items-center justify-center rounded-full border px-4",
-              boxStroke(editing),
-            )}
-          >
+          <WidgetOutline
+            show={editing}
+            className="-inset-x-3 -inset-y-2 rounded-[28px]"
+          />
+          <div className="box-border flex h-7 w-full items-center justify-center rounded-full border border-neutral-800 px-4">
             <HintField
               value={draft.subtitle}
               hint="부제를 입력하세요"
@@ -286,12 +287,7 @@ export function JournalTimeline({
       ) : null}
 
       <div className="relative mb-4 w-full max-w-[300px]" {...(!editing ? bind : {})}>
-        <div
-          className={cn(
-            "box-border flex h-10 w-full items-center justify-center rounded-[22px] border px-4",
-            boxStroke(editing),
-          )}
-        >
+        <div className="box-border flex h-10 w-full items-center justify-center rounded-[22px] border border-neutral-800 px-4">
           <HintField
             value={draft.title}
             hint="제목을 입력하세요"
