@@ -86,10 +86,12 @@ export function IosSwitch({
   checked,
   onCheckedChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -97,16 +99,21 @@ export function IosSwitch({
       role="switch"
       aria-label={label}
       aria-checked={checked}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors",
-        checked ? "bg-neutral-900" : "bg-neutral-300",
+        "relative box-border h-[31px] w-[51px] shrink-0 overflow-hidden rounded-full border-0 p-0",
+        "transition-all duration-200 ease-in-out",
+        checked ? "bg-neutral-900" : "bg-[#E5E7EB]",
+        disabled && "cursor-not-allowed opacity-40",
       )}
     >
       <span
         className={cn(
-          "absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition-transform",
-          checked ? "translate-x-[22px]" : "translate-x-[2px]",
+          "absolute top-[2px] left-[2px] block size-[27px] rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.22)]",
+          "transition-all duration-200 ease-in-out",
+          checked ? "translate-x-[20px]" : "translate-x-0",
         )}
       />
     </button>
