@@ -61,6 +61,10 @@ function useEnterEdit() {
   };
 }
 
+function boxStroke(editing: boolean) {
+  return editing ? "border-neutral-800" : "border-transparent";
+}
+
 function HintField({
   value,
   hint,
@@ -74,34 +78,26 @@ function HintField({
   className?: string;
   onChange: (next: string) => void;
 }) {
-  const filled = value.trim().length > 0;
-  const shared =
-    "h-full w-full appearance-none border-0 bg-transparent p-0 text-center outline-none placeholder:text-neutral-400";
-  if (editing) {
-    return (
-      <p
-        className={cn(
-          "flex h-full w-full items-center justify-center overflow-hidden text-center whitespace-nowrap",
-          className,
-          !filled && "text-neutral-400",
-        )}
-      >
-        {filled ? value : hint}
-      </p>
-    );
-  }
   return (
     <input
       value={value}
+      readOnly={editing}
+      tabIndex={editing ? -1 : 0}
       placeholder={hint}
       onFocus={(event) => {
+        if (editing) return;
         event.currentTarget.placeholder = "";
       }}
       onBlur={(event) => {
         event.currentTarget.placeholder = hint;
       }}
       onChange={(event) => onChange(event.target.value)}
-      className={cn(shared, "overflow-hidden whitespace-nowrap", className)}
+      className={cn(
+        "h-full w-full appearance-none border-0 bg-transparent p-0 text-center outline-none placeholder:text-neutral-400",
+        "overflow-hidden whitespace-nowrap",
+        editing && "pointer-events-none",
+        className,
+      )}
     />
   );
 }
@@ -176,12 +172,17 @@ function SortableCourse({
       <div
         {...(!editing ? bind : {})}
         className={cn(
-          "relative mx-auto flex max-w-[340px] items-center justify-between gap-2 py-1.5",
-          editing && "rounded-[24px] border border-neutral-800 px-2.5 py-2",
+          "relative mx-auto box-border flex w-full max-w-[340px] items-center justify-between gap-2 rounded-[24px] border px-2.5 py-2",
+          boxStroke(editing),
         )}
       >
         <div className="flex min-w-0 flex-1 justify-end">
-          <div className="flex h-7 w-[10.75rem] items-center justify-center rounded-full border border-neutral-800 px-3">
+          <div
+            className={cn(
+              "box-border flex h-7 w-[10.75rem] items-center justify-center rounded-full border px-3",
+              boxStroke(editing),
+            )}
+          >
             <HintField
               value={course.placeName}
               hint="장소명을 입력하세요"
@@ -259,8 +260,8 @@ export function JournalTimeline({
         <div className="relative mb-2.5 w-full max-w-[260px]" {...(!editing ? bind : {})}>
           <div
             className={cn(
-              "flex h-7 items-center justify-center rounded-full border border-neutral-800 px-4",
-              editing && "mr-6",
+              "box-border flex h-7 w-full items-center justify-center rounded-full border px-4",
+              boxStroke(editing),
             )}
           >
             <HintField
@@ -285,7 +286,12 @@ export function JournalTimeline({
       ) : null}
 
       <div className="relative mb-4 w-full max-w-[300px]" {...(!editing ? bind : {})}>
-        <div className="flex h-10 items-center justify-center rounded-[22px] border border-neutral-800 px-4">
+        <div
+          className={cn(
+            "box-border flex h-10 w-full items-center justify-center rounded-[22px] border px-4",
+            boxStroke(editing),
+          )}
+        >
           <HintField
             value={draft.title}
             hint="제목을 입력하세요"
