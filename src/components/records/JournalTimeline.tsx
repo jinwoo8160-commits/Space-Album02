@@ -177,13 +177,49 @@ function useEnterEdit() {
   };
 }
 
-function WidgetOutline({ show, className }: { show: boolean; className?: string }) {
+function WidgetFrame({
+  show,
+  className,
+  onDelete,
+  deleteLabel,
+}: {
+  show: boolean;
+  className?: string;
+  onDelete?: () => void;
+  deleteLabel?: string;
+}) {
   if (!show) return null;
   return (
     <div
-      aria-hidden
-      className={cn("pointer-events-none absolute border border-neutral-800", className)}
-    />
+      className={cn("pointer-events-none absolute z-[3] border", className)}
+      style={{
+        borderWidth: 1,
+        borderColor: "rgba(255, 255, 255, 0.72)",
+        boxShadow:
+          "0 0 10px rgba(170, 205, 255, 0.45), 0 0 1px rgba(255, 255, 255, 0.85)",
+      }}
+    >
+      {onDelete ? (
+        <button
+          type="button"
+          aria-label={deleteLabel}
+          className="pointer-events-auto absolute flex size-[22px] items-center justify-center rounded-full"
+          style={{
+            top: -10,
+            right: -10,
+            background: "rgba(168, 178, 190, 0.55)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow:
+              "inset 0 0.5px 0 rgba(255, 255, 255, 0.55), 0 0.5px 1.5px rgba(0, 0, 0, 0.14)",
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onDelete}
+        >
+          <Minus className="size-3 text-white" strokeWidth={2.8} />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -308,7 +344,12 @@ function SortableCourse({
         className="relative mx-auto flex w-full max-w-[340px] shrink-0 items-center justify-between gap-2"
         style={{ height: rowH, paddingTop: padY / 2, paddingBottom: padY / 2 }}
       >
-        <WidgetOutline show={editing} className="-inset-x-2 inset-y-0 rounded-[24px]" />
+        <WidgetFrame
+          show={editing}
+          className="-inset-x-2 inset-y-0 rounded-[18px]"
+          onDelete={canDelete ? onDelete : undefined}
+          deleteLabel="코스 삭제"
+        />
         <div className="flex min-w-0 flex-1 justify-end">
           <div
             className="box-border flex shrink-0 items-center justify-center rounded-full border border-neutral-800 px-2.5"
@@ -335,17 +376,6 @@ function SortableCourse({
             onOpen={onPhoto}
           />
         </div>
-        {editing && canDelete ? (
-          <button
-            type="button"
-            aria-label="코스 삭제"
-            className="absolute top-1/2 -right-1 flex size-7 -translate-y-1/2 translate-x-full items-center justify-center rounded-full bg-neutral-300 text-white"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onDelete}
-          >
-            <Minus className="size-4" strokeWidth={2.4} />
-          </button>
-        ) : null}
       </div>
     </div>
   );
@@ -411,7 +441,12 @@ export function JournalTimeline({
             style={{ marginBottom: SUBTITLE_TO_TITLE }}
             {...(!editing ? bind : {})}
           >
-            <WidgetOutline show={editing} className="-inset-x-3 -inset-y-2 rounded-[28px]" />
+            <WidgetFrame
+              show={editing}
+              className="-inset-x-3 -inset-y-2 rounded-[20px]"
+              onDelete={() => setDraft((prev) => ({ ...prev, subtitleVisible: false, subtitle: "" }))}
+              deleteLabel="부제 삭제"
+            />
             <div className="box-border flex h-7 w-full items-center justify-center rounded-full border border-neutral-800 px-4">
               <HintField
                 value={draft.subtitle}
@@ -421,16 +456,6 @@ export function JournalTimeline({
                 onChange={(subtitle) => setDraft((prev) => ({ ...prev, subtitle }))}
               />
             </div>
-            {editing ? (
-              <button
-                type="button"
-                aria-label="부제 삭제"
-                className="absolute top-1/2 -right-1 flex size-7 -translate-y-1/2 translate-x-full items-center justify-center rounded-full bg-neutral-300 text-white"
-                onClick={() => setDraft((prev) => ({ ...prev, subtitleVisible: false, subtitle: "" }))}
-              >
-                <Minus className="size-4" strokeWidth={2.4} />
-              </button>
-            ) : null}
           </div>
         ) : null}
 
