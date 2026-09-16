@@ -66,28 +66,33 @@ function HintField({
   hint,
   editing,
   className,
-  multiline,
   onChange,
 }: {
   value: string;
   hint: string;
   editing: boolean;
   className?: string;
-  multiline?: boolean;
   onChange: (next: string) => void;
 }) {
   const filled = value.trim().length > 0;
+  const shared =
+    "h-full w-full appearance-none border-0 bg-transparent p-0 text-center outline-none placeholder:text-neutral-400";
   if (editing) {
     return (
-      <p className={cn("whitespace-pre-wrap", !multiline && "truncate", className, !filled && "text-neutral-400")}>
+      <p
+        className={cn(
+          "flex h-full w-full items-center justify-center overflow-hidden text-center whitespace-nowrap",
+          className,
+          !filled && "text-neutral-400",
+        )}
+      >
         {filled ? value : hint}
       </p>
     );
   }
   return (
-    <textarea
+    <input
       value={value}
-      rows={multiline ? 2 : 1}
       placeholder={hint}
       onFocus={(event) => {
         event.currentTarget.placeholder = "";
@@ -96,10 +101,7 @@ function HintField({
         event.currentTarget.placeholder = hint;
       }}
       onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          "w-full resize-none overflow-hidden bg-transparent text-center outline-none placeholder:text-neutral-400",
-          className,
-        )}
+      className={cn(shared, "overflow-hidden whitespace-nowrap", className)}
     />
   );
 }
@@ -174,18 +176,17 @@ function SortableCourse({
       <div
         {...(!editing ? bind : {})}
         className={cn(
-          "relative mx-auto flex max-w-[320px] items-center justify-between gap-3 py-2",
-          editing && "rounded-[28px] border border-neutral-800 px-3 py-2.5",
+          "relative mx-auto flex max-w-[340px] items-center justify-between gap-2 py-1.5",
+          editing && "rounded-[24px] border border-neutral-800 px-2.5 py-2",
         )}
       >
         <div className="flex min-w-0 flex-1 justify-end">
-          <div className="w-[118px] rounded-full border border-neutral-800 px-2 py-2">
+          <div className="flex h-7 w-[10.75rem] items-center justify-center rounded-full border border-neutral-800 px-3">
             <HintField
               value={course.placeName}
               hint="장소명을 입력하세요"
               editing={editing}
-              multiline
-              className="text-[12px] leading-tight"
+              className="text-[12px] leading-[28px]"
               onChange={onPlace}
             />
           </div>
@@ -255,13 +256,18 @@ export function JournalTimeline({
       ) : null}
 
       {draft.subtitleVisible ? (
-        <div className="relative mb-3 w-full max-w-[260px]" {...(!editing ? bind : {})}>
-          <div className={cn("rounded-full border border-neutral-800 px-4 py-2", editing && "mr-6")}>
+        <div className="relative mb-2.5 w-full max-w-[260px]" {...(!editing ? bind : {})}>
+          <div
+            className={cn(
+              "flex h-7 items-center justify-center rounded-full border border-neutral-800 px-4",
+              editing && "mr-6",
+            )}
+          >
             <HintField
               value={draft.subtitle}
               hint="부제를 입력하세요"
               editing={editing}
-              className="text-[13px]"
+              className="text-[13px] leading-[28px]"
               onChange={(subtitle) => setDraft((prev) => ({ ...prev, subtitle }))}
             />
           </div>
@@ -278,13 +284,16 @@ export function JournalTimeline({
         </div>
       ) : null}
 
-      <div className="relative mb-5 w-full max-w-[300px]" {...(!editing ? bind : {})}>
-        <div className="rounded-[28px] border border-neutral-800 px-4 py-3">
+      <div className="relative mb-4 w-full max-w-[300px]" {...(!editing ? bind : {})}>
+        <div className="flex h-10 items-center justify-center rounded-[22px] border border-neutral-800 px-4">
           <HintField
             value={draft.title}
             hint="제목을 입력하세요"
             editing={editing}
-            className={cn("text-[20px] font-medium", draft.title.trim() && "text-[24px] font-bold")}
+            className={cn(
+              "text-[18px] leading-[40px] font-medium",
+              draft.title.trim() && "text-[22px] font-bold",
+            )}
             onChange={(title) => setDraft((prev) => ({ ...prev, title }))}
           />
         </div>
