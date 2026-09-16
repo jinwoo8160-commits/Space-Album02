@@ -11,4 +11,4 @@ export type JournalDraft = {
   courses: JournalCourse[];
 };
 
-export const JOURNAL_MAX_COURSES = 6;
+export const JOURNAL_MAX_COURSES = 5;

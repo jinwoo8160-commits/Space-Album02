@@ -7,7 +7,7 @@ import { canAddCourse, emptyCourse } from "@/lib/journal";
 import { hexByCategoryList, hexForCategory } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import type { Photo } from "@/types/album";
-import type { JournalCourse } from "@/types/journal";
+import { JOURNAL_MAX_COURSES, type JournalCourse } from "@/types/journal";
 import {
   closestCenter,
   DndContext,
@@ -36,6 +36,8 @@ import {
 } from "react";
 
 const PLACE_BOX_H = 28;
+/** ~80% of the previous 10.75rem (172px) place pill. */
+const PLACE_WIDTH = Math.round(10.75 * 16 * 0.8);
 const TITLE_H = 40;
 const SUBTITLE_H = 28;
 const SUBTITLE_TO_TITLE = 8;
@@ -49,11 +51,15 @@ const PHOTO_MIN = 44;
 const GAP_DEFAULT = 16;
 /** Keeps edit-mode widget outlines from colliding. */
 const GAP_MIN = 8;
+/** Clearance above subtitle so share/collage buttons never collide at 5 courses. */
+const SAFE_TOP = 56;
+/** 10–15% micro-shrink of photo, place box, and padding when the list is full. */
+const COMPACT_SCALE = 0.88;
 
 const LONG_PRESS_MS = 520;
 
-function rowHeight(photoSize: number) {
-  return Math.max(PLACE_BOX_H, photoSize) + ROW_PAD_Y;
+function rowHeight(photoSize: number, placeH: number, padY: number) {
+  return Math.max(placeH, photoSize) + padY;
 }
 
 function useTimelineFit({
@@ -68,15 +74,21 @@ function useTimelineFit({
   showAddSubtitle: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const atMax = courseCount >= JOURNAL_MAX_COURSES;
   const [photoSize, setPhotoSize] = useState(PHOTO_MAX);
+  const [placeH, setPlaceH] = useState(PLACE_BOX_H);
+  const [padY, setPadY] = useState(ROW_PAD_Y);
   const [gap, setGap] = useState(GAP_DEFAULT);
+  const [safeTop, setSafeTop] = useState(0);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const apply = () => {
-      const available = el.clientHeight;
+      const nextSafe = atMax ? SAFE_TOP : 0;
+      setSafeTop(nextSafe);
+      const available = el.clientHeight - nextSafe;
       const header =
         (showAddSubtitle ? ADD_SUBTITLE_H + ADD_SUBTITLE_MB : 0) +
         (subtitleVisible ? SUBTITLE_H + SUBTITLE_TO_TITLE : 0) +
@@ -84,36 +96,55 @@ function useTimelineFit({
       const plus = showPlus ? PLUS_BTN_PX : 0;
       const n = Math.max(1, courseCount);
       const gapCount = 1 + (n - 1) + (showPlus ? 1 : 0);
+      const scale = atMax ? COMPACT_SCALE : 1;
+      const photoBase = PHOTO_MAX * scale;
+      const placeBase = PLACE_BOX_H * scale;
+      const padBase = ROW_PAD_Y * scale;
+      const gapBase = atMax ? GAP_MIN : GAP_DEFAULT;
 
-      const blockH = (photo: number, nextGap: number) =>
-        header + n * rowHeight(photo) + plus + gapCount * nextGap;
+      const blockH = (photo: number, place: number, pad: number, nextGap: number) =>
+        header + n * rowHeight(photo, place, pad) + plus + gapCount * nextGap;
 
-      if (blockH(PHOTO_MAX, GAP_DEFAULT) <= available) {
-        setPhotoSize(PHOTO_MAX);
-        setGap(GAP_DEFAULT);
+      if (blockH(photoBase, placeBase, padBase, gapBase) <= available) {
+        setPhotoSize(photoBase);
+        setPlaceH(placeBase);
+        setPadY(padBase);
+        setGap(gapBase);
         return;
       }
 
-      if (blockH(PHOTO_MAX, GAP_MIN) <= available) {
-        const leftover = available - (header + n * rowHeight(PHOTO_MAX) + plus);
-        setPhotoSize(PHOTO_MAX);
+      if (blockH(photoBase, placeBase, padBase, GAP_MIN) <= available) {
+        const leftover = available - (header + n * rowHeight(photoBase, placeBase, padBase) + plus);
+        setPhotoSize(photoBase);
+        setPlaceH(placeBase);
+        setPadY(padBase);
         setGap(Math.max(GAP_MIN, leftover / gapCount));
         return;
       }
 
       const leftover = available - header - plus - gapCount * GAP_MIN;
-      const nextPhoto = Math.max(PHOTO_MIN, Math.min(PHOTO_MAX, leftover / n - ROW_PAD_Y));
+      const nextPhoto = Math.max(PHOTO_MIN, leftover / n - padBase);
+      setPlaceH(placeBase);
+      setPadY(padBase);
       setGap(GAP_MIN);
-      setPhotoSize(nextPhoto);
+      setPhotoSize(Math.min(photoBase, nextPhoto));
     };
 
     apply();
     const observer = new ResizeObserver(apply);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [courseCount, showPlus, subtitleVisible, showAddSubtitle]);
+  }, [atMax, courseCount, showPlus, subtitleVisible, showAddSubtitle]);
 
-  return { containerRef, photoSize, gap, rowH: rowHeight(photoSize) };
+  return {
+    containerRef,
+    photoSize,
+    placeH,
+    padY,
+    gap,
+    safeTop,
+    rowH: rowHeight(photoSize, placeH, padY),
+  };
 }
 
 function useEnterEdit() {
@@ -237,6 +268,8 @@ function SortableCourse({
   editing,
   canDelete,
   photoSize,
+  placeH,
+  padY,
   rowH,
   onPlace,
   onPhoto,
@@ -248,6 +281,8 @@ function SortableCourse({
   editing: boolean;
   canDelete: boolean;
   photoSize: number;
+  placeH: number;
+  padY: number;
   rowH: number;
   onPlace: (value: string) => void;
   onPhoto: () => void;
@@ -270,17 +305,20 @@ function SortableCourse({
     >
       <div
         {...(!editing ? bind : {})}
-        className="relative mx-auto flex w-full max-w-[340px] shrink-0 items-center justify-between gap-2 py-1.5"
-        style={{ height: rowH }}
+        className="relative mx-auto flex w-full max-w-[340px] shrink-0 items-center justify-between gap-2"
+        style={{ height: rowH, paddingTop: padY / 2, paddingBottom: padY / 2 }}
       >
         <WidgetOutline show={editing} className="-inset-x-2 inset-y-0 rounded-[24px]" />
         <div className="flex min-w-0 flex-1 justify-end">
-          <div className="box-border flex h-7 w-[10.75rem] shrink-0 items-center justify-center rounded-full border border-neutral-800 px-3">
+          <div
+            className="box-border flex shrink-0 items-center justify-center rounded-full border border-neutral-800 px-2.5"
+            style={{ height: placeH, width: PLACE_WIDTH }}
+          >
             <HintField
               value={course.placeName}
               hint="장소명을 입력하세요"
               editing={editing}
-              className="text-[12px] leading-[28px]"
+              className="text-[12px]"
               onChange={onPlace}
             />
           </div>
@@ -331,7 +369,7 @@ export function JournalTimeline({
   const count = draft.courses.length;
   const showPlus = canAddCourse(draft.courses);
   const showAddSubtitle = editing && !draft.subtitleVisible;
-  const { containerRef, photoSize, gap, rowH } = useTimelineFit({
+  const { containerRef, photoSize, placeH, padY, gap, safeTop, rowH } = useTimelineFit({
     courseCount: count,
     showPlus,
     subtitleVisible: draft.subtitleVisible,
@@ -353,6 +391,7 @@ export function JournalTimeline({
     <div
       ref={containerRef}
       className="flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden px-2"
+      style={{ paddingTop: safeTop }}
     >
       <div className="flex w-full shrink-0 flex-col items-center">
         {showAddSubtitle ? (
@@ -443,6 +482,8 @@ export function JournalTimeline({
                       editing={editing}
                       canDelete={count > 1}
                       photoSize={photoSize}
+                      placeH={placeH}
+                      padY={padY}
                       rowH={rowH}
                       onPlace={(placeName) =>
                         setDraft((prev) => ({
