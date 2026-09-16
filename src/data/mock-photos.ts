@@ -248,6 +248,16 @@ const UNLOCATED_PHOTOS: Photo[] = [
 
 export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS, ...UNLOCATED_PHOTOS];
 
+export const KOREA_PLACE_OPTIONS = HUBS.map((hub) => ({
+  id: hub.name,
+  name: hub.name,
+  lat: hub.lat,
+  lng: hub.lng,
+  locationLabel: hub.locationLabel,
+  districtLabel: hub.districtLabel,
+  provinceId: hub.provinceId,
+}));
+
 export const KOREA_MOCK_COUNT = KOREA_PHOTO_COUNT;
 
 export function latestPhotoYear(photos: Photo[] = MOCK_PHOTOS): number {

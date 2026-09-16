@@ -12,8 +12,10 @@ import {
 } from "@/lib/album-period";
 import { sortPhotosByTakenAt } from "@/lib/album";
 import { hexByCategoryList, hexForCategory } from "@/lib/categories";
+import { photoNeedsMeta } from "@/lib/journal";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { Photo } from "@/types/album";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
@@ -24,15 +26,29 @@ const AlbumMiniMapView = dynamic(
 
 const DEFAULT_CURSOR = new Date(2026, 8, 13);
 
+export type AlbumScreenProps = {
+  variant?: "page" | "picker";
+  selectedPhotoId?: string | null;
+  onPickPhoto?: (photo: Photo) => void;
+  onNeedMeta?: (photo: Photo) => void;
+};
+
 /**
  * 앨범 탭. 년/월/주/일, 한반도 미니 지도, 5열 사진 그리드.
+ * 기록 탭의 선택 앨범 모달에서도 같은 탐색 UI를 씁니다.
  */
-export function AlbumScreen() {
+export function AlbumScreen({
+  variant = "page",
+  selectedPhotoId = null,
+  onPickPhoto,
+  onNeedMeta,
+}: AlbumScreenProps) {
   const { photos, openPhoto, keyCategories } = useMap();
   const [range, setRange] = useState<AlbumRange>("month");
   const [cursor, setCursor] = useState(() => DEFAULT_CURSOR);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const hexById = useMemo(() => hexByCategoryList(keyCategories), [keyCategories]);
+  const picker = variant === "picker";
 
   const periodPhotos = useMemo(
     () => sortPhotosByTakenAt(photosInPeriod(photos, range, cursor), "desc"),
@@ -59,9 +75,21 @@ export function AlbumScreen() {
     setPinnedId((current) => (current === photoId ? null : photoId));
   };
 
+  const onThumbClick = (photo: Photo) => {
+    if (!picker) {
+      openPhoto(photo.id);
+      return;
+    }
+    if (photoNeedsMeta(photo)) {
+      onNeedMeta?.(photo);
+      return;
+    }
+    onPickPhoto?.(photo);
+  };
+
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-white">
-      <div className="px-4 pt-4">
+      <div className={cn("px-4", picker ? "pt-2" : "pt-4")}>
         <div className="flex rounded-full bg-[#ececee] p-1">
           {ALBUM_RANGES.map((item) => {
             const active = range === item.id;
@@ -116,21 +144,27 @@ export function AlbumScreen() {
           이 기간에 등록된 추억이 없습니다.
         </p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-28">
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-3.5", picker ? "pb-24" : "pb-28")}>
           <div className="grid grid-cols-5 gap-2">
             {periodPhotos.map((photo) => {
               const hex = photo.category ? hexForCategory(photo.category, hexById) : null;
               const canPin = Boolean(hex && photo.hasGps !== false);
               const pinned = pinnedId === photo.id;
+              const checked = picker && selectedPhotoId === photo.id;
               return (
                 <button
                   key={photo.id}
                   type="button"
-                  onClick={() => openPhoto(photo.id)}
+                  onClick={() => onThumbClick(photo)}
                   className="relative aspect-square overflow-hidden rounded-2xl bg-neutral-100"
                   aria-label={photo.title}
                 >
                   <AlbumThumb scene={photo.scene} className="h-full w-full" />
+                  {checked ? (
+                    <span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-[#3b82f6] text-white shadow">
+                      <Check className="size-3.5" strokeWidth={3} />
+                    </span>
+                  ) : null}
                   {canPin && hex ? (
                     <span
                       role="button"

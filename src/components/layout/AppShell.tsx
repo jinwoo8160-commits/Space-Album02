@@ -3,6 +3,7 @@
 import { BottomTabBar } from "@/components/layout/BottomTabBar";
 import { MapScreen } from "@/components/map/MapScreen";
 import { PhotoDetailModal } from "@/components/map/PhotoDetailModal";
+import { JournalProvider } from "@/context/journal-context";
 import { MapProvider } from "@/context/map-context";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -19,7 +20,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <MapProvider>
-      <div className="flex min-h-dvh items-center justify-center bg-neutral-200 p-0 sm:p-6">
+      <JournalProvider>
+        <div className="flex min-h-dvh items-center justify-center bg-neutral-200 p-0 sm:p-6">
         <div
           id="phone-frame"
           className="relative flex h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-white sm:h-[min(844px,100dvh)] sm:rounded-[36px] sm:border sm:border-neutral-200 sm:shadow-[0_24px_80px_rgba(0,0,0,0.18)]"
@@ -38,7 +40,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <PhotoDetailModal />
           <BottomTabBar />
         </div>
-      </div>
+        </div>
+      </JournalProvider>
     </MapProvider>
   );
 }

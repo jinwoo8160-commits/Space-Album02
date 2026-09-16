@@ -2,6 +2,7 @@
 
 import { TAB_ACTIVE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useJournal } from "@/context/journal-context";
 import { Crosshair, Image as ImageIcon, List, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,6 +20,7 @@ const TABS = [
 
 export function BottomTabBar() {
   const pathname = usePathname();
+  const { tabBarLocked } = useJournal();
 
   return (
     <nav className="pointer-events-auto absolute inset-x-3 bottom-3.5 z-30 sm:inset-x-4 sm:bottom-4">
@@ -29,12 +31,9 @@ export function BottomTabBar() {
               ? pathname === "/"
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           const Icon = tab.icon;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className="flex min-w-0 flex-1 flex-col items-center gap-1 py-0.5"
-            >
+          const className = "flex min-w-0 flex-1 flex-col items-center gap-1 py-0.5";
+          const body = (
+            <>
               <Icon
                 className={cn("size-6", !active && "text-neutral-800")}
                 style={active ? { color: TAB_ACTIVE } : undefined}
@@ -46,6 +45,18 @@ export function BottomTabBar() {
               >
                 {tab.label}
               </span>
+            </>
+          );
+          if (tabBarLocked) {
+            return (
+              <span key={tab.href} className={cn(className, "pointer-events-none opacity-40")}>
+                {body}
+              </span>
+            );
+          }
+          return (
+            <Link key={tab.href} href={tab.href} className={className}>
+              {body}
             </Link>
           );
         })}

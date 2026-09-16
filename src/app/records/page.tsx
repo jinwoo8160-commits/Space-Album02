@@ -1,5 +1,5 @@
-import { RecordEmpty } from "@/components/records/RecordEmpty";
+import { RecordScreen } from "@/components/records/RecordScreen";
 
 export default function RecordsPage() {
-  return <RecordEmpty />;
+  return <RecordScreen />;
 }

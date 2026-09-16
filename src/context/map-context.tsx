@@ -105,6 +105,7 @@ type MapContextValue = {
   albumIndex: number;
   albumCount: number;
   setPhotoCategory: (photoId: string, category: CategoryColor) => void;
+  updatePhoto: (photoId: string, patch: Partial<Photo>) => void;
   countryModalOpen: boolean;
   setCountryModalOpen: (open: boolean) => void;
   settings: AppSettings;
@@ -199,6 +200,20 @@ export function MapProvider({ children }: { children: ReactNode }) {
     const nextCategory = fallbackBlackPhotoCategory(category, hexById);
     setPhotos((prev) =>
       prev.map((photo) => (photo.id === photoId ? { ...photo, category: nextCategory } : photo)),
+    );
+  }, [keyCategories]);
+
+  const updatePhoto = useCallback((photoId: string, patch: Partial<Photo>) => {
+    const hexById = hexByCategoryList(keyCategories);
+    setPhotos((prev) =>
+      prev.map((photo) => {
+        if (photo.id !== photoId) return photo;
+        const next = { ...photo, ...patch };
+        if (patch.category !== undefined) {
+          next.category = fallbackBlackPhotoCategory(patch.category, hexById);
+        }
+        return next;
+      }),
     );
   }, [keyCategories]);
 
@@ -297,6 +312,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     albumIndex,
     albumCount: albumPhotos.length,
     setPhotoCategory,
+    updatePhoto,
     countryModalOpen,
     setCountryModalOpen,
     settings,
