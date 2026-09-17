@@ -35,6 +35,12 @@ const LAT_MAX = 39;
 const ZOOM_MIN = 3;
 const ZOOM_MAX = 7;
 
+const INITIAL_VIEW = {
+  longitude: ALBUM_SOUTH_CENTER[0],
+  latitude: ALBUM_SOUTH_CENTER[1],
+  zoom: ALBUM_OVERVIEW_ZOOM,
+};
+
 const MINI_DENSITY_OPACITY: ExpressionSpecification = [
   "match",
   ["get", "densityLevel"],
@@ -168,6 +174,8 @@ export function AlbumMiniMap({
   const [lng, setLng] = useState(ALBUM_SOUTH_CENTER[0]);
   const [lat, setLat] = useState(ALBUM_SOUTH_CENTER[1]);
   const [zoom, setZoom] = useState(ALBUM_OVERVIEW_ZOOM);
+  const overviewRef = useRef({ lng, lat, zoom });
+  overviewRef.current = { lng, lat, zoom };
 
   const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
 
@@ -251,9 +259,9 @@ export function AlbumMiniMap({
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map || !ready.current) return;
-    syncStage(map);
     if (isPinned && pinnedPhoto) {
       wasPinned.current = true;
+      applyPreviewStage(map, "detail");
       try {
         map.stop();
         map.flyTo({
@@ -265,27 +273,45 @@ export function AlbumMiniMap({
           essential: true,
         });
       } catch {
-        /* ignore */
+        map.jumpTo({
+          center: [pinnedPhoto.lng, pinnedPhoto.lat],
+          zoom: ALBUM_PIN_ZOOM,
+          bearing: 0,
+          pitch: 0,
+        });
       }
-      return;
+      const onEnd = () => {
+        applyPreviewStage(map, "detail");
+      };
+      map.once("moveend", onEnd);
+      return () => {
+        map.off("moveend", onEnd);
+      };
     }
     if (wasPinned.current) {
       wasPinned.current = false;
+      const home = overviewRef.current;
+      applyPreviewStage(map, photosRef.current.length === 0 ? "detail" : "dots");
       try {
         map.stop();
         map.flyTo({
-          center: [lng, lat],
-          zoom,
+          center: [home.lng, home.lat],
+          zoom: home.zoom,
           bearing: 0,
           pitch: 0,
           duration: 780,
           essential: true,
         });
       } catch {
-        /* ignore */
+        map.jumpTo({
+          center: [home.lng, home.lat],
+          zoom: home.zoom,
+          bearing: 0,
+          pitch: 0,
+        });
       }
     }
-  }, [isPinned, lat, lng, pinnedPhoto, syncStage, zoom]);
+  }, [isPinned, pinnedPhoto]);
 
   if (!MAPBOX_TOKEN) {
     return <div className="h-full w-full bg-white" />;
@@ -298,11 +324,7 @@ export function AlbumMiniMap({
           ref={mapRef}
           mapboxAccessToken={MAPBOX_TOKEN}
           mapStyle={DOT_MAP_STYLE}
-          initialViewState={{
-            longitude: ALBUM_SOUTH_CENTER[0],
-            latitude: ALBUM_SOUTH_CENTER[1],
-            zoom: ALBUM_OVERVIEW_ZOOM,
-          }}
+          initialViewState={INITIAL_VIEW}
           minZoom={ZOOM_MIN}
           maxZoom={17.5}
           interactive={false}
