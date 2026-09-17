@@ -23,12 +23,18 @@ import {
 } from "@/lib/map-style";
 import type { Photo } from "@/types/album";
 import type { ExpressionSpecification, GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
 
 const EMPTY_GRID = { type: "FeatureCollection" as const, features: [] };
 
-/** 미니맵은 점이 조금 더 커도 검게 뭉치지 않게 opacity 상한을 낮춥니다. */
+const LNG_MIN = 126;
+const LNG_MAX = 130;
+const LAT_MIN = 33;
+const LAT_MAX = 39;
+const ZOOM_MIN = 3;
+const ZOOM_MAX = 7;
+
 const MINI_DENSITY_OPACITY: ExpressionSpecification = [
   "match",
   ["get", "densityLevel"],
@@ -59,7 +65,7 @@ function setLayerVisible(map: MapboxMap, layerId: string, visible: boolean) {
     if (map.getLayoutProperty(layerId, "visibility") === next) return;
     map.setLayoutProperty(layerId, "visibility", next);
   } catch {
-    /* flyTo / setData 중에 스타일 그래프가 잠깐 비어 있을 수 있습니다. */
+    /* style graph can be empty mid-update */
   }
 }
 
@@ -101,41 +107,43 @@ function ensureMiniDotLayer(map: MapboxMap) {
   }
 }
 
-function flyOverview(map: MapboxMap) {
-  try {
-    map.stop();
-    map.flyTo({
-      center: ALBUM_SOUTH_CENTER,
-      zoom: ALBUM_OVERVIEW_ZOOM,
-      bearing: 0,
-      pitch: 0,
-      duration: 780,
-      essential: true,
-    });
-  } catch {
-    /* ignore */
-  }
-}
-
-function flyToPhoto(map: MapboxMap, photo: Photo) {
-  try {
-    map.stop();
-    map.flyTo({
-      center: [photo.lng, photo.lat],
-      zoom: ALBUM_PIN_ZOOM,
-      bearing: 0,
-      pitch: 0,
-      duration: 780,
-      essential: true,
-    });
-  } catch {
-    /* ignore */
-  }
+function DebugSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  digits,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  digits: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-[10px] leading-none text-neutral-800">
+      <span className="w-8 shrink-0 font-medium">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-1 min-w-0 flex-1 accent-neutral-900"
+      />
+      <span className="w-[4.25rem] shrink-0 tabular-nums">{value.toFixed(digits)}</span>
+    </label>
+  );
 }
 
 /**
  * 앨범 기간 프리뷰 미니맵.
- * 사용자 팬/줌은 막고, 기간 필터와 키컬러 핀만 카메라를 움직입니다.
+ * 팬/줌은 막고, 임시 조절 바와 키컬러 핀만 카메라를 움직입니다.
  */
 export function AlbumMiniMap({
   photos,
@@ -157,12 +165,35 @@ export function AlbumMiniMap({
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
+  const [lng, setLng] = useState(ALBUM_SOUTH_CENTER[0]);
+  const [lat, setLat] = useState(ALBUM_SOUTH_CENTER[1]);
+  const [zoom, setZoom] = useState(ALBUM_OVERVIEW_ZOOM);
+
   const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
 
   const syncStage = useCallback((map: MapboxMap) => {
     const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
     applyPreviewStage(map, pinned || photosRef.current.length === 0 ? "detail" : "dots");
   }, []);
+
+  const jumpOverview = useCallback(
+    (nextLng: number, nextLat: number, nextZoom: number) => {
+      const map = mapRef.current?.getMap();
+      if (!map || !ready.current) return;
+      try {
+        map.stop();
+        map.jumpTo({
+          center: [nextLng, nextLat],
+          zoom: nextZoom,
+          bearing: 0,
+          pitch: 0,
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
 
   const rebuildGrid = useCallback(
     (force = false) => {
@@ -212,99 +243,166 @@ export function AlbumMiniMap({
   }, [photos, rebuildGrid]);
 
   useEffect(() => {
+    if (!ready.current) return;
+    if (pinnedRef.current && pinnedRef.current.hasGps !== false) return;
+    jumpOverview(lng, lat, zoom);
+  }, [jumpOverview, lat, lng, zoom]);
+
+  useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map || !ready.current) return;
     syncStage(map);
     if (isPinned && pinnedPhoto) {
       wasPinned.current = true;
-      flyToPhoto(map, pinnedPhoto);
+      try {
+        map.stop();
+        map.flyTo({
+          center: [pinnedPhoto.lng, pinnedPhoto.lat],
+          zoom: ALBUM_PIN_ZOOM,
+          bearing: 0,
+          pitch: 0,
+          duration: 780,
+          essential: true,
+        });
+      } catch {
+        /* ignore */
+      }
       return;
     }
     if (wasPinned.current) {
       wasPinned.current = false;
-      flyOverview(map);
+      try {
+        map.stop();
+        map.flyTo({
+          center: [lng, lat],
+          zoom,
+          bearing: 0,
+          pitch: 0,
+          duration: 780,
+          essential: true,
+        });
+      } catch {
+        /* ignore */
+      }
     }
-  }, [isPinned, pinnedPhoto, syncStage]);
+  }, [isPinned, lat, lng, pinnedPhoto, syncStage, zoom]);
 
   if (!MAPBOX_TOKEN) {
     return <div className="h-full w-full bg-white" />;
   }
 
   return (
-    <div className="pointer-events-none relative h-full w-full overflow-hidden bg-white">
-      <Map
-        ref={mapRef}
-        mapboxAccessToken={MAPBOX_TOKEN}
-        mapStyle={DOT_MAP_STYLE}
-        initialViewState={{
-          longitude: ALBUM_SOUTH_CENTER[0],
-          latitude: ALBUM_SOUTH_CENTER[1],
-          zoom: ALBUM_OVERVIEW_ZOOM,
-        }}
-        minZoom={ALBUM_OVERVIEW_ZOOM}
-        maxZoom={17.5}
-        interactive={false}
-        attributionControl={false}
-        dragPan={false}
-        scrollZoom={false}
-        doubleClickZoom={false}
-        dragRotate={false}
-        pitchWithRotate={false}
-        touchPitch={false}
-        keyboard={false}
-        boxZoom={false}
-        touchZoomRotate={false}
-        renderWorldCopies={false}
-        antialias={false}
-        fadeDuration={0}
-        style={{ width: "100%", height: "100%", minHeight: ALBUM_MINI_MAP_PX }}
-        onLoad={(event) => {
-          const map = event.target;
-          map.dragPan.disable();
-          map.scrollZoom.disable();
-          map.boxZoom.disable();
-          map.dragRotate.disable();
-          map.keyboard.disable();
-          map.doubleClickZoom.disable();
-          map.touchZoomRotate.disable();
-          applyMapTheme(map, "light");
-          ensureMiniDotLayer(map);
-          map.jumpTo({
-            center: ALBUM_SOUTH_CENTER,
+    <div className="relative h-full w-full overflow-hidden bg-white">
+      <div className="pointer-events-none absolute inset-0">
+        <Map
+          ref={mapRef}
+          mapboxAccessToken={MAPBOX_TOKEN}
+          mapStyle={DOT_MAP_STYLE}
+          initialViewState={{
+            longitude: ALBUM_SOUTH_CENTER[0],
+            latitude: ALBUM_SOUTH_CENTER[1],
             zoom: ALBUM_OVERVIEW_ZOOM,
-            bearing: 0,
-            pitch: 0,
-          });
-          ready.current = true;
-          rebuildGrid(true);
-          const pinned = pinnedRef.current;
-          if (pinned && pinned.hasGps !== false) {
-            applyPreviewStage(map, "detail");
+          }}
+          minZoom={ZOOM_MIN}
+          maxZoom={17.5}
+          interactive={false}
+          attributionControl={false}
+          dragPan={false}
+          scrollZoom={false}
+          doubleClickZoom={false}
+          dragRotate={false}
+          pitchWithRotate={false}
+          touchPitch={false}
+          keyboard={false}
+          boxZoom={false}
+          touchZoomRotate={false}
+          renderWorldCopies={false}
+          antialias={false}
+          fadeDuration={0}
+          style={{ width: "100%", height: "100%", minHeight: ALBUM_MINI_MAP_PX }}
+          onLoad={(event) => {
+            const map = event.target;
+            map.dragPan.disable();
+            map.scrollZoom.disable();
+            map.boxZoom.disable();
+            map.dragRotate.disable();
+            map.keyboard.disable();
+            map.doubleClickZoom.disable();
+            map.touchZoomRotate.disable();
+            applyMapTheme(map, "light");
+            ensureMiniDotLayer(map);
             map.jumpTo({
-              center: [pinned.lng, pinned.lat],
-              zoom: ALBUM_PIN_ZOOM,
+              center: ALBUM_SOUTH_CENTER,
+              zoom: ALBUM_OVERVIEW_ZOOM,
               bearing: 0,
               pitch: 0,
             });
-          }
-
-          const onSourceData = (sourceEvent: { isSourceLoaded?: boolean; sourceId?: string }) => {
-            if (!sourceEvent.isSourceLoaded || sourceEvent.sourceId !== "mapbox-streets") return;
-            if (gridKeyRef.current !== "") return;
+            ready.current = true;
             rebuildGrid(true);
-          };
-          map.on("sourcedata", onSourceData);
-        }}
-      >
-        {isPinned && pinnedPhoto ? (
-          <Marker longitude={pinnedPhoto.lng} latitude={pinnedPhoto.lat} anchor="center">
-            <span
-              className="block size-3.5 rounded-full ring-2 ring-white"
-              style={{ backgroundColor: pinColor ?? "#111111" }}
-            />
-          </Marker>
-        ) : null}
-      </Map>
+            const pinned = pinnedRef.current;
+            if (pinned && pinned.hasGps !== false) {
+              applyPreviewStage(map, "detail");
+              map.jumpTo({
+                center: [pinned.lng, pinned.lat],
+                zoom: ALBUM_PIN_ZOOM,
+                bearing: 0,
+                pitch: 0,
+              });
+            }
+
+            const onSourceData = (sourceEvent: { isSourceLoaded?: boolean; sourceId?: string }) => {
+              if (!sourceEvent.isSourceLoaded || sourceEvent.sourceId !== "mapbox-streets") return;
+              if (gridKeyRef.current !== "") return;
+              rebuildGrid(true);
+            };
+            map.on("sourcedata", onSourceData);
+          }}
+        >
+          {isPinned && pinnedPhoto ? (
+            <Marker longitude={pinnedPhoto.lng} latitude={pinnedPhoto.lat} anchor="center">
+              <span
+                className="block size-3.5 rounded-full ring-2 ring-white"
+                style={{ backgroundColor: pinColor ?? "#111111" }}
+              />
+            </Marker>
+          ) : null}
+        </Map>
+      </div>
+
+      <div className="pointer-events-auto absolute inset-x-10 top-1 z-20 rounded-lg bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
+        <p className="mb-1 text-[9px] font-medium tracking-wide text-neutral-400 uppercase">
+          임시 뷰포트 조절
+        </p>
+        <div className="flex flex-col gap-1">
+          <DebugSlider
+            label="Lng"
+            value={lng}
+            min={LNG_MIN}
+            max={LNG_MAX}
+            step={0.0001}
+            digits={4}
+            onChange={setLng}
+          />
+          <DebugSlider
+            label="Lat"
+            value={lat}
+            min={LAT_MIN}
+            max={LAT_MAX}
+            step={0.0001}
+            digits={4}
+            onChange={setLat}
+          />
+          <DebugSlider
+            label="Zoom"
+            value={zoom}
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={0.01}
+            digits={2}
+            onChange={setZoom}
+          />
+        </div>
+      </div>
     </div>
   );
 }

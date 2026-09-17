@@ -5,4 +5,4 @@
 export const ALBUM_MINI_MAP_PX = 200;
 export const ALBUM_MINI_GRID_CELLS = 60;
 /** 메인 지도 1.85px보다 조금 키워 200px 프레임에서도 점이 읽히게 합니다. */
-export const ALBUM_MINI_DOT_RADIUS = 2.25;
+export const ALBUM_MINI_DOT_RADIUS = 2;
