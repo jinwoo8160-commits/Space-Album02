@@ -43,11 +43,24 @@ const MINI_DENSITY_OPACITY: ExpressionSpecification = [
   0.16,
 ];
 
+function mapStyleReady(map: MapboxMap) {
+  try {
+    return Boolean(map.style && map.isStyleLoaded());
+  } catch {
+    return false;
+  }
+}
+
 function setLayerVisible(map: MapboxMap, layerId: string, visible: boolean) {
-  if (!map.getLayer(layerId)) return;
-  const next = visible ? "visible" : "none";
-  if (map.getLayoutProperty(layerId, "visibility") === next) return;
-  map.setLayoutProperty(layerId, "visibility", next);
+  if (!mapStyleReady(map)) return;
+  try {
+    if (!map.getLayer(layerId)) return;
+    const next = visible ? "visible" : "none";
+    if (map.getLayoutProperty(layerId, "visibility") === next) return;
+    map.setLayoutProperty(layerId, "visibility", next);
+  } catch {
+    /* flyTo / setData 중에 스타일 그래프가 잠깐 비어 있을 수 있습니다. */
+  }
 }
 
 function applyPreviewStage(map: MapboxMap, mode: "dots" | "detail") {
@@ -58,51 +71,66 @@ function applyPreviewStage(map: MapboxMap, mode: "dots" | "detail") {
 }
 
 function ensureMiniDotLayer(map: MapboxMap) {
-  if (!map.getSource(LAND_GRID_SOURCE)) {
-    map.addSource(LAND_GRID_SOURCE, { type: "geojson", data: EMPTY_GRID });
-  }
-  if (!map.getLayer(LAND_GRID_LAYER)) {
-    map.addLayer({
-      id: LAND_GRID_LAYER,
-      type: "circle",
-      source: LAND_GRID_SOURCE,
-      layout: { visibility: "visible" },
-      paint: {
-        "circle-radius": ALBUM_MINI_DOT_RADIUS,
-        "circle-pitch-alignment": "viewport",
-        "circle-color": landDotColorExpr("light"),
-        "circle-opacity": MINI_DENSITY_OPACITY,
-        "circle-color-transition": { duration: 220, delay: 0 },
-        "circle-opacity-transition": { duration: 220, delay: 0 },
-      },
-    });
-  } else {
-    map.setPaintProperty(LAND_GRID_LAYER, "circle-radius", ALBUM_MINI_DOT_RADIUS);
-    map.setPaintProperty(LAND_GRID_LAYER, "circle-color", landDotColorExpr("light"));
-    map.setPaintProperty(LAND_GRID_LAYER, "circle-opacity", MINI_DENSITY_OPACITY);
+  if (!mapStyleReady(map)) return;
+  try {
+    if (!map.getSource(LAND_GRID_SOURCE)) {
+      map.addSource(LAND_GRID_SOURCE, { type: "geojson", data: EMPTY_GRID });
+    }
+    if (!map.getLayer(LAND_GRID_LAYER)) {
+      map.addLayer({
+        id: LAND_GRID_LAYER,
+        type: "circle",
+        source: LAND_GRID_SOURCE,
+        layout: { visibility: "visible" },
+        paint: {
+          "circle-radius": ALBUM_MINI_DOT_RADIUS,
+          "circle-pitch-alignment": "viewport",
+          "circle-color": landDotColorExpr("light"),
+          "circle-opacity": MINI_DENSITY_OPACITY,
+          "circle-color-transition": { duration: 220, delay: 0 },
+          "circle-opacity-transition": { duration: 220, delay: 0 },
+        },
+      });
+    } else {
+      map.setPaintProperty(LAND_GRID_LAYER, "circle-radius", ALBUM_MINI_DOT_RADIUS);
+      map.setPaintProperty(LAND_GRID_LAYER, "circle-color", landDotColorExpr("light"));
+      map.setPaintProperty(LAND_GRID_LAYER, "circle-opacity", MINI_DENSITY_OPACITY);
+    }
+  } catch {
+    /* ignore transient style access */
   }
 }
 
 function flyOverview(map: MapboxMap) {
-  map.flyTo({
-    center: ALBUM_SOUTH_CENTER,
-    zoom: ALBUM_OVERVIEW_ZOOM,
-    bearing: 0,
-    pitch: 0,
-    duration: 780,
-    essential: true,
-  });
+  try {
+    map.stop();
+    map.flyTo({
+      center: ALBUM_SOUTH_CENTER,
+      zoom: ALBUM_OVERVIEW_ZOOM,
+      bearing: 0,
+      pitch: 0,
+      duration: 780,
+      essential: true,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 function flyToPhoto(map: MapboxMap, photo: Photo) {
-  map.flyTo({
-    center: [photo.lng, photo.lat],
-    zoom: ALBUM_PIN_ZOOM,
-    bearing: 0,
-    pitch: 0,
-    duration: 780,
-    essential: true,
-  });
+  try {
+    map.stop();
+    map.flyTo({
+      center: [photo.lng, photo.lat],
+      zoom: ALBUM_PIN_ZOOM,
+      bearing: 0,
+      pitch: 0,
+      duration: 780,
+      essential: true,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -124,6 +152,8 @@ export function AlbumMiniMap({
   const photosRef = useRef(photos);
   const pinnedRef = useRef(pinnedPhoto);
   const gridKeyRef = useRef("");
+  const wasPinned = useRef(false);
+  const rebuildTimer = useRef<number | null>(null);
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
@@ -138,39 +168,47 @@ export function AlbumMiniMap({
     (force = false) => {
       const map = mapRef.current?.getMap();
       if (!map || !ready.current) return;
-      if (!map.isStyleLoaded()) return;
+      if (!mapStyleReady(map)) return;
       if (!map.areTilesLoaded()) return;
 
-      ensureMiniDotLayer(map);
-      const source = map.getSource(LAND_GRID_SOURCE) as GeoJSONSource | undefined;
-      if (!source) return;
+      try {
+        ensureMiniDotLayer(map);
+        const source = map.getSource(LAND_GRID_SOURCE) as GeoJSONSource | undefined;
+        if (!source) return;
 
-      const current = photosRef.current;
-      if (current.length === 0) {
-        source.setData(EMPTY_GRID);
-        gridKeyRef.current = "empty";
+        const current = photosRef.current;
+        if (current.length === 0) {
+          source.setData(EMPTY_GRID);
+          gridKeyRef.current = "empty";
+          syncStage(map);
+          return;
+        }
+
+        const key = current.map((photo) => `${photo.id}:${photo.category ?? "_"}`).join(",");
+        if (!force && gridKeyRef.current === key) {
+          syncStage(map);
+          return;
+        }
+
+        source.setData(
+          buildLandDotGrid(map, current, "kr", false, {}, { gridCells: ALBUM_MINI_GRID_CELLS }),
+        );
+        gridKeyRef.current = key;
         syncStage(map);
-        return;
+      } catch {
+        /* queryRenderedFeatures / getLayer can throw while the style graph is swapping */
       }
-
-      const key = current.map((photo) => `${photo.id}:${photo.category ?? "_"}`).join(",");
-      if (!force && gridKeyRef.current === key) {
-        syncStage(map);
-        return;
-      }
-
-      source.setData(
-        buildLandDotGrid(map, current, "kr", false, {}, { gridCells: ALBUM_MINI_GRID_CELLS }),
-      );
-      gridKeyRef.current = key;
-      syncStage(map);
     },
     [syncStage],
   );
 
   useEffect(() => {
     if (!ready.current) return;
-    rebuildGrid(false);
+    if (rebuildTimer.current) window.clearTimeout(rebuildTimer.current);
+    rebuildTimer.current = window.setTimeout(() => rebuildGrid(false), 80);
+    return () => {
+      if (rebuildTimer.current) window.clearTimeout(rebuildTimer.current);
+    };
   }, [photos, rebuildGrid]);
 
   useEffect(() => {
@@ -178,10 +216,14 @@ export function AlbumMiniMap({
     if (!map || !ready.current) return;
     syncStage(map);
     if (isPinned && pinnedPhoto) {
+      wasPinned.current = true;
       flyToPhoto(map, pinnedPhoto);
       return;
     }
-    flyOverview(map);
+    if (wasPinned.current) {
+      wasPinned.current = false;
+      flyOverview(map);
+    }
   }, [isPinned, pinnedPhoto, syncStage]);
 
   if (!MAPBOX_TOKEN) {
