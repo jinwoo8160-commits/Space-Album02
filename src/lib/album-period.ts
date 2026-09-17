@@ -2,8 +2,8 @@ import type { Photo } from "@/types/album";
 
 export type AlbumRange = "year" | "month" | "week" | "day";
 
-/** 남한 중심. 청주시 기준. 디버그 바와 기본 카메라가 이 값을 씁니다. */
-export const ALBUM_SOUTH_CENTER: [number, number] = [127.489, 36.6424];
+/** 앨범 미니맵 기본 카메라 중심. */
+export const ALBUM_SOUTH_CENTER: [number, number] = [127.719, 35.8643]; // 127.7190, 35.8643
 
 /** 앨범 미니맵 기본 카메라 줌. */
 export const ALBUM_OVERVIEW_ZOOM = 4.4;

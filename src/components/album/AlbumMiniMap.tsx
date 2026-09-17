@@ -23,25 +23,23 @@ import {
 } from "@/lib/map-style";
 import type { Photo } from "@/types/album";
 import type { ExpressionSpecification, GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
-import { GripHorizontal } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef } from "react";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
 
 const EMPTY_GRID = { type: "FeatureCollection" as const, features: [] };
-
-const LNG_MIN = 126;
-const LNG_MAX = 130;
-const LAT_MIN = 33;
-const LAT_MAX = 39;
-const ZOOM_MIN = 3;
-const ZOOM_MAX = 7;
 
 const INITIAL_VIEW = {
   longitude: ALBUM_SOUTH_CENTER[0],
   latitude: ALBUM_SOUTH_CENTER[1],
   zoom: ALBUM_OVERVIEW_ZOOM,
 };
+
+const OVERVIEW_CAMERA = {
+  center: ALBUM_SOUTH_CENTER,
+  zoom: ALBUM_OVERVIEW_ZOOM,
+  bearing: 0,
+  pitch: 0,
+} as const;
 
 const MINI_DENSITY_OPACITY: ExpressionSpecification = [
   "match",
@@ -115,175 +113,32 @@ function ensureMiniDotLayer(map: MapboxMap) {
   }
 }
 
-function DebugSlider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  digits,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  digits: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <label className="flex items-center gap-2 text-[10px] leading-none text-neutral-800">
-      <span className="w-8 shrink-0 font-medium">{label}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        onPointerDown={(event) => event.stopPropagation()}
-        className="h-1 min-w-0 flex-1 accent-neutral-900"
-      />
-      <span className="w-[4.25rem] shrink-0 tabular-nums">{value.toFixed(digits)}</span>
-    </label>
-  );
+function jumpOverview(map: MapboxMap) {
+  try {
+    map.stop();
+    map.jumpTo({ ...OVERVIEW_CAMERA });
+  } catch {
+    /* ignore */
+  }
 }
 
-function ViewportDebugPanel({
-  lng,
-  lat,
-  zoom,
-  onLng,
-  onLat,
-  onZoom,
-}: {
-  lng: number;
-  lat: number;
-  zoom: number;
-  onLng: (next: number) => void;
-  onLat: (next: number) => void;
-  onZoom: (next: number) => void;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{
-    pointerId: number;
-    grabX: number;
-    grabY: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  const [pos, setPos] = useState({ x: 16, y: 292 });
-  const [dragging, setDragging] = useState(false);
-
-  useEffect(() => {
-    const frame = document.getElementById("phone-frame");
-    setHost(frame);
-    if (!frame) return;
-    const mapEl = frame.querySelector("[data-album-mini-map]");
-    if (!mapEl) return;
-    const frameRect = frame.getBoundingClientRect();
-    const mapRect = mapEl.getBoundingClientRect();
-    setPos({
-      x: 16,
-      y: Math.round(mapRect.bottom - frameRect.top + 8),
+function flyOverview(map: MapboxMap) {
+  try {
+    map.stop();
+    map.flyTo({
+      ...OVERVIEW_CAMERA,
+      duration: 780,
+      essential: true,
     });
-  }, []);
-
-  const clampPos = useCallback(
-    (x: number, y: number, width: number, height: number) => {
-      if (!host) return { x, y };
-      const maxX = Math.max(8, host.clientWidth - width - 8);
-      const maxY = Math.max(8, host.clientHeight - height - 8);
-      return {
-        x: Math.min(maxX, Math.max(8, x)),
-        y: Math.min(maxY, Math.max(8, y)),
-      };
-    },
-    [host],
-  );
-
-  useEffect(() => {
-    const onMove = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      const frame = host?.getBoundingClientRect();
-      if (!frame) return;
-      event.preventDefault();
-      setPos(
-        clampPos(
-          event.clientX - frame.left - drag.grabX,
-          event.clientY - frame.top - drag.grabY,
-          drag.width,
-          drag.height,
-        ),
-      );
-    };
-    const onUp = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      dragRef.current = null;
-      setDragging(false);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-    };
-  }, [clampPos, host]);
-
-  const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const panel = panelRef.current;
-    const frame = host?.getBoundingClientRect();
-    if (!panel || !frame) return;
-    const box = panel.getBoundingClientRect();
-    dragRef.current = {
-      pointerId: event.pointerId,
-      grabX: event.clientX - box.left,
-      grabY: event.clientY - box.top,
-      width: box.width,
-      height: box.height,
-    };
-    setDragging(true);
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  if (!host) return null;
-
-  return createPortal(
-    <div
-      ref={panelRef}
-      className="pointer-events-auto absolute z-[60] w-[min(320px,calc(100%-32px))] select-none rounded-lg bg-white/95 px-2.5 py-1.5 shadow-md backdrop-blur-sm"
-      style={{ left: pos.x, top: pos.y }}
-    >
-      <div
-        className={`mb-1 flex items-center gap-1.5 ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
-        style={{ touchAction: "none" }}
-        onPointerDown={onHandlePointerDown}
-      >
-        <GripHorizontal className="size-3.5 shrink-0 text-neutral-400" />
-        <p className="text-[9px] font-medium tracking-wide text-neutral-400 uppercase">
-          임시 뷰포트 조절 · 드래그해서 이동
-        </p>
-      </div>
-      <div className="flex flex-col gap-1">
-        <DebugSlider label="Lng" value={lng} min={LNG_MIN} max={LNG_MAX} step={0.0001} digits={4} onChange={onLng} />
-        <DebugSlider label="Lat" value={lat} min={LAT_MIN} max={LAT_MAX} step={0.0001} digits={4} onChange={onLat} />
-        <DebugSlider label="Zoom" value={zoom} min={ZOOM_MIN} max={ZOOM_MAX} step={0.01} digits={2} onChange={onZoom} />
-      </div>
-    </div>,
-    host,
-  );
+  } catch {
+    jumpOverview(map);
+  }
 }
 
 /**
  * 앨범 기간 프리뷰 미니맵.
- * 팬/줌은 막고, 임시 조절 바와 키컬러 핀만 카메라를 움직입니다.
+ * 팬/줌은 막고, 키컬러 핀만 카메라를 움직입니다.
+ * 핀을 해제하면 고정 남한 뷰포트로 돌아갑니다.
  */
 export function AlbumMiniMap({
   photos,
@@ -305,37 +160,12 @@ export function AlbumMiniMap({
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
-  const [lng, setLng] = useState(ALBUM_SOUTH_CENTER[0]);
-  const [lat, setLat] = useState(ALBUM_SOUTH_CENTER[1]);
-  const [zoom, setZoom] = useState(ALBUM_OVERVIEW_ZOOM);
-  const overviewRef = useRef({ lng, lat, zoom });
-  overviewRef.current = { lng, lat, zoom };
-
   const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
 
   const syncStage = useCallback((map: MapboxMap) => {
     const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
     applyPreviewStage(map, pinned || photosRef.current.length === 0 ? "detail" : "dots");
   }, []);
-
-  const jumpOverview = useCallback(
-    (nextLng: number, nextLat: number, nextZoom: number) => {
-      const map = mapRef.current?.getMap();
-      if (!map || !ready.current) return;
-      try {
-        map.stop();
-        map.jumpTo({
-          center: [nextLng, nextLat],
-          zoom: nextZoom,
-          bearing: 0,
-          pitch: 0,
-        });
-      } catch {
-        /* ignore */
-      }
-    },
-    [],
-  );
 
   const rebuildGrid = useCallback(
     (force = false) => {
@@ -385,12 +215,6 @@ export function AlbumMiniMap({
   }, [photos, rebuildGrid]);
 
   useEffect(() => {
-    if (!ready.current) return;
-    if (pinnedRef.current && pinnedRef.current.hasGps !== false) return;
-    jumpOverview(lng, lat, zoom);
-  }, [jumpOverview, lat, lng, zoom]);
-
-  useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map || !ready.current) return;
     if (isPinned && pinnedPhoto) {
@@ -424,26 +248,8 @@ export function AlbumMiniMap({
     }
     if (wasPinned.current) {
       wasPinned.current = false;
-      const home = overviewRef.current;
       applyPreviewStage(map, photosRef.current.length === 0 ? "detail" : "dots");
-      try {
-        map.stop();
-        map.flyTo({
-          center: [home.lng, home.lat],
-          zoom: home.zoom,
-          bearing: 0,
-          pitch: 0,
-          duration: 780,
-          essential: true,
-        });
-      } catch {
-        map.jumpTo({
-          center: [home.lng, home.lat],
-          zoom: home.zoom,
-          bearing: 0,
-          pitch: 0,
-        });
-      }
+      flyOverview(map);
     }
   }, [isPinned, pinnedPhoto]);
 
@@ -452,14 +258,14 @@ export function AlbumMiniMap({
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-white" data-album-mini-map>
+    <div className="relative h-full w-full overflow-hidden bg-white">
       <div className="pointer-events-none absolute inset-0">
         <Map
           ref={mapRef}
           mapboxAccessToken={MAPBOX_TOKEN}
           mapStyle={DOT_MAP_STYLE}
           initialViewState={INITIAL_VIEW}
-          minZoom={ZOOM_MIN}
+          minZoom={3}
           maxZoom={17.5}
           interactive={false}
           attributionControl={false}
@@ -487,12 +293,7 @@ export function AlbumMiniMap({
             map.touchZoomRotate.disable();
             applyMapTheme(map, "light");
             ensureMiniDotLayer(map);
-            map.jumpTo({
-              center: ALBUM_SOUTH_CENTER,
-              zoom: ALBUM_OVERVIEW_ZOOM,
-              bearing: 0,
-              pitch: 0,
-            });
+            jumpOverview(map);
             ready.current = true;
             rebuildGrid(true);
             const pinned = pinnedRef.current;
@@ -524,8 +325,6 @@ export function AlbumMiniMap({
           ) : null}
         </Map>
       </div>
-
-      <ViewportDebugPanel lng={lng} lat={lat} zoom={zoom} onLng={setLng} onLat={setLat} onZoom={setZoom} />
     </div>
   );
 }
