@@ -14,6 +14,7 @@ import {
 } from "@/lib/album-period";
 import { buildLandDotGrid } from "@/lib/land-dots";
 import { applyMapTheme, landDotColorExpr } from "@/lib/map-theme";
+import { applyMapStage } from "@/lib/map-stage";
 import {
   DETAIL_LAYER_IDS,
   DOT_MAP_STYLE,
@@ -21,6 +22,7 @@ import {
   LAND_GRID_SOURCE,
   MAPBOX_TOKEN,
 } from "@/lib/map-style";
+import { DOT_MAX_ZOOM } from "@/lib/zoom";
 import type { Photo } from "@/types/album";
 import type { ExpressionSpecification, GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import { useCallback, useEffect, useRef } from "react";
@@ -63,6 +65,14 @@ function mapStyleReady(map: MapboxMap) {
   }
 }
 
+function resizeMap(map: MapboxMap) {
+  try {
+    map.resize();
+  } catch {
+    /* canvas can be missing for one frame */
+  }
+}
+
 function setLayerVisible(map: MapboxMap, layerId: string, visible: boolean) {
   if (!mapStyleReady(map)) return;
   try {
@@ -80,6 +90,17 @@ function applyPreviewStage(map: MapboxMap, mode: "dots" | "detail") {
   for (const layerId of DETAIL_LAYER_IDS) {
     setLayerVisible(map, layerId, mode === "detail");
   }
+}
+
+/** lastStage 를 null 로 넘겨 같은 스테이지라도 visibility 를 다시 맞춥니다. */
+function syncMiniStage(map: MapboxMap, mode: "dots" | "detail") {
+  const zoom = mode === "detail" ? ALBUM_PIN_ZOOM : ALBUM_OVERVIEW_ZOOM;
+  try {
+    applyMapStage(map, zoom, null);
+  } catch {
+    /* getLayer can throw while the style graph is swapping */
+  }
+  applyPreviewStage(map, mode);
 }
 
 function ensureMiniDotLayer(map: MapboxMap) {
@@ -151,85 +172,109 @@ export function AlbumMiniMap({
   hexById?: Record<string, string>;
 }) {
   const mapRef = useRef<MapRef | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const ready = useRef(false);
   const photosRef = useRef(photos);
   const pinnedRef = useRef(pinnedPhoto);
   const gridKeyRef = useRef("");
   const wasPinned = useRef(false);
+  const flightGen = useRef(0);
   const rebuildTimer = useRef<number | null>(null);
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
   const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
 
-  const syncStage = useCallback((map: MapboxMap) => {
-    const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
-    applyPreviewStage(map, pinned || photosRef.current.length === 0 ? "detail" : "dots");
-  }, []);
+  const rebuildGrid = useCallback((force = false) => {
+    const map = mapRef.current?.getMap();
+    if (!map || !ready.current) return;
+    if (!mapStyleReady(map)) return;
 
-  const rebuildGrid = useCallback(
-    (force = false) => {
-      const map = mapRef.current?.getMap();
-      if (!map || !ready.current) return;
-      if (!mapStyleReady(map)) return;
-      if (!map.areTilesLoaded()) return;
+    try {
+      resizeMap(map);
+      ensureMiniDotLayer(map);
+      const source = map.getSource(LAND_GRID_SOURCE) as GeoJSONSource | undefined;
+      if (!source) return;
 
-      try {
-        ensureMiniDotLayer(map);
-        const source = map.getSource(LAND_GRID_SOURCE) as GeoJSONSource | undefined;
-        if (!source) return;
+      const current = photosRef.current;
+      const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
 
-        const current = photosRef.current;
-        if (current.length === 0) {
-          source.setData(EMPTY_GRID);
-          gridKeyRef.current = "empty";
-          syncStage(map);
-          return;
-        }
-
-        const key = current.map((photo) => `${photo.id}:${photo.category ?? "_"}`).join(",");
-        if (!force && gridKeyRef.current === key) {
-          syncStage(map);
-          return;
-        }
-
-        source.setData(
-          buildLandDotGrid(map, current, "kr", false, {}, { gridCells: ALBUM_MINI_GRID_CELLS }),
-        );
-        gridKeyRef.current = key;
-        syncStage(map);
-      } catch {
-        /* queryRenderedFeatures / getLayer can throw while the style graph is swapping */
+      if (current.length === 0) {
+        source.setData(EMPTY_GRID);
+        gridKeyRef.current = "empty";
+        if (!pinned) syncMiniStage(map, "detail");
+        return;
       }
-    },
-    [syncStage],
-  );
+
+      const key = current.map((photo) => `${photo.id}:${photo.category ?? "_"}`).join(",");
+      if (!force && gridKeyRef.current === key) {
+        if (!pinned) syncMiniStage(map, "dots");
+        return;
+      }
+
+      source.setData(
+        buildLandDotGrid(map, current, "kr", false, {}, { gridCells: ALBUM_MINI_GRID_CELLS }),
+      );
+      gridKeyRef.current = key;
+      if (!pinned) syncMiniStage(map, "dots");
+    } catch {
+      /* queryRenderedFeatures / getLayer can throw while the style graph is swapping */
+    }
+  }, []);
 
   useEffect(() => {
     if (!ready.current) return;
+    const map = mapRef.current?.getMap();
+    if (map) resizeMap(map);
     if (rebuildTimer.current) window.clearTimeout(rebuildTimer.current);
-    rebuildTimer.current = window.setTimeout(() => rebuildGrid(false), 80);
+    rebuildTimer.current = window.setTimeout(() => rebuildGrid(true), 0);
     return () => {
       if (rebuildTimer.current) window.clearTimeout(rebuildTimer.current);
     };
   }, [photos, rebuildGrid]);
 
   useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const observer = new ResizeObserver(() => {
+      const map = mapRef.current?.getMap();
+      if (!map || !ready.current) return;
+      resizeMap(map);
+      if (!pinnedRef.current || pinnedRef.current.hasGps === false) {
+        rebuildGrid(gridKeyRef.current === "");
+      }
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [rebuildGrid]);
+
+  useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map || !ready.current) return;
+    const gen = ++flightGen.current;
+
     if (isPinned && pinnedPhoto) {
+      const alreadyZoomed = wasPinned.current || map.getZoom() >= DOT_MAX_ZOOM;
       wasPinned.current = true;
-      applyPreviewStage(map, "detail");
+      syncMiniStage(map, "detail");
       try {
         map.stop();
-        map.flyTo({
-          center: [pinnedPhoto.lng, pinnedPhoto.lat],
-          zoom: ALBUM_PIN_ZOOM,
-          bearing: 0,
-          pitch: 0,
-          duration: 780,
-          essential: true,
-        });
+        if (alreadyZoomed) {
+          map.easeTo({
+            center: [pinnedPhoto.lng, pinnedPhoto.lat],
+            duration: 480,
+            essential: true,
+          });
+        } else {
+          map.flyTo({
+            center: [pinnedPhoto.lng, pinnedPhoto.lat],
+            zoom: ALBUM_PIN_ZOOM,
+            bearing: 0,
+            pitch: 0,
+            duration: 780,
+            essential: true,
+          });
+        }
       } catch {
         map.jumpTo({
           center: [pinnedPhoto.lng, pinnedPhoto.lat],
@@ -239,26 +284,49 @@ export function AlbumMiniMap({
         });
       }
       const onEnd = () => {
-        applyPreviewStage(map, "detail");
+        if (gen !== flightGen.current) return;
+        syncMiniStage(map, "detail");
       };
       map.once("moveend", onEnd);
       return () => {
         map.off("moveend", onEnd);
       };
     }
-    if (wasPinned.current) {
-      wasPinned.current = false;
-      applyPreviewStage(map, photosRef.current.length === 0 ? "detail" : "dots");
-      flyOverview(map);
-    }
-  }, [isPinned, pinnedPhoto]);
+
+    if (!wasPinned.current) return;
+    wasPinned.current = false;
+
+    const restoreOverview = () => {
+      if (gen !== flightGen.current) return;
+      if (map.getZoom() >= DOT_MAX_ZOOM) return;
+      resizeMap(map);
+      const empty = photosRef.current.length === 0;
+      syncMiniStage(map, empty ? "detail" : "dots");
+      if (!empty) rebuildGrid(true);
+    };
+
+    const onEnd = () => {
+      if (gen !== flightGen.current) return;
+      if (map.getZoom() >= DOT_MAX_ZOOM) return;
+      map.off("moveend", onEnd);
+      map.off("zoomend", onEnd);
+      restoreOverview();
+    };
+    map.on("moveend", onEnd);
+    map.on("zoomend", onEnd);
+    flyOverview(map);
+    return () => {
+      map.off("moveend", onEnd);
+      map.off("zoomend", onEnd);
+    };
+  }, [isPinned, pinnedPhoto, rebuildGrid]);
 
   if (!MAPBOX_TOKEN) {
     return <div className="h-full w-full bg-white" />;
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-white">
+    <div ref={hostRef} className="relative h-full w-full overflow-hidden bg-white">
       <div className="pointer-events-none absolute inset-0">
         <Map
           ref={mapRef}
@@ -292,25 +360,36 @@ export function AlbumMiniMap({
             map.doubleClickZoom.disable();
             map.touchZoomRotate.disable();
             applyMapTheme(map, "light");
-            ensureMiniDotLayer(map);
+            resizeMap(map);
             jumpOverview(map);
+            ensureMiniDotLayer(map);
             ready.current = true;
+            const pinned = pinnedRef.current && pinnedRef.current.hasGps !== false;
+            syncMiniStage(map, pinned ? "detail" : photosRef.current.length === 0 ? "detail" : "dots");
             rebuildGrid(true);
-            const pinned = pinnedRef.current;
-            if (pinned && pinned.hasGps !== false) {
-              applyPreviewStage(map, "detail");
+            if (pinned && pinnedRef.current) {
               map.jumpTo({
-                center: [pinned.lng, pinned.lat],
+                center: [pinnedRef.current.lng, pinnedRef.current.lat],
                 zoom: ALBUM_PIN_ZOOM,
                 bearing: 0,
                 pitch: 0,
               });
             }
 
+            const paintOverview = () => {
+              if (!ready.current) return;
+              resizeMap(map);
+              if (pinnedRef.current && pinnedRef.current.hasGps !== false) return;
+              jumpOverview(map);
+              rebuildGrid(true);
+            };
+            requestAnimationFrame(paintOverview);
+            map.once("idle", paintOverview);
+
             const onSourceData = (sourceEvent: { isSourceLoaded?: boolean; sourceId?: string }) => {
               if (!sourceEvent.isSourceLoaded || sourceEvent.sourceId !== "mapbox-streets") return;
-              if (gridKeyRef.current !== "") return;
-              rebuildGrid(true);
+              if (pinnedRef.current && pinnedRef.current.hasGps !== false) return;
+              rebuildGrid(gridKeyRef.current === "" || gridKeyRef.current === "empty" ? true : false);
             };
             map.on("sourcedata", onSourceData);
           }}
