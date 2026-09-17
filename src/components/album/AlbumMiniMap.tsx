@@ -93,10 +93,11 @@ function applyPreviewStage(map: MapboxMap, mode: "dots" | "detail") {
 }
 
 function liveStage(map: MapboxMap, lastStage: MapStage | null, emptyOverview: boolean): MapStage {
-  const next: MapStage = emptyOverview ? "detail" : mapStageFromZoom(map.getZoom());
+  const zoom = map.getZoom();
+  const next: MapStage = emptyOverview ? "detail" : mapStageFromZoom(zoom);
   if (next === lastStage) return next;
   try {
-    applyMapStage(map, emptyOverview ? ALBUM_PIN_ZOOM : map.getZoom(), lastStage);
+    applyMapStage(map, zoom, lastStage);
   } catch {
     /* getLayer can throw while the style graph is swapping */
   }
@@ -144,16 +145,29 @@ function jumpOverview(map: MapboxMap) {
   }
 }
 
-function flyOverview(map: MapboxMap) {
+function easeCamera(
+  map: MapboxMap,
+  camera: { center: [number, number]; zoom?: number },
+  duration: number,
+) {
   try {
     map.stop();
-    map.flyTo({
-      ...OVERVIEW_CAMERA,
-      duration: 780,
+    map.easeTo({
+      center: camera.center,
+      ...(camera.zoom != null ? { zoom: camera.zoom } : {}),
+      bearing: 0,
+      pitch: 0,
+      duration,
+      easing: (t) => t,
       essential: true,
     });
   } catch {
-    jumpOverview(map);
+    map.jumpTo({
+      center: camera.center,
+      zoom: camera.zoom ?? map.getZoom(),
+      bearing: 0,
+      pitch: 0,
+    });
   }
 }
 
@@ -265,34 +279,12 @@ export function AlbumMiniMap({
     const gen = ++flightGen.current;
 
     if (isPinned && pinnedPhoto) {
-      const alreadyZoomed = wasPinned.current || map.getZoom() >= DOT_MAX_ZOOM;
+      const startZoom = map.getZoom();
+      const inbound = startZoom < DOT_MAX_ZOOM;
       wasPinned.current = true;
-      try {
-        map.stop();
-        if (alreadyZoomed) {
-          map.easeTo({
-            center: [pinnedPhoto.lng, pinnedPhoto.lat],
-            duration: 480,
-            essential: true,
-          });
-        } else {
-          map.flyTo({
-            center: [pinnedPhoto.lng, pinnedPhoto.lat],
-            zoom: ALBUM_PIN_ZOOM,
-            bearing: 0,
-            pitch: 0,
-            duration: 780,
-            essential: true,
-          });
-        }
-      } catch {
-        map.jumpTo({
-          center: [pinnedPhoto.lng, pinnedPhoto.lat],
-          zoom: ALBUM_PIN_ZOOM,
-          bearing: 0,
-          pitch: 0,
-        });
-        applyStageForZoom(map);
+      if (inbound) {
+        applyPreviewStage(map, "dots");
+        stageRef.current = "dots";
       }
       const onZoom = () => {
         if (gen !== flightGen.current) return;
@@ -300,11 +292,18 @@ export function AlbumMiniMap({
       };
       const onEnd = () => {
         if (gen !== flightGen.current) return;
+        if (inbound && map.getZoom() < DOT_MAX_ZOOM) return;
+        map.off("moveend", onEnd);
         applyStageForZoom(map);
       };
       map.on("zoom", onZoom);
       map.on("render", onZoom);
-      map.once("moveend", onEnd);
+      map.on("moveend", onEnd);
+      if (inbound) {
+        easeCamera(map, { center: [pinnedPhoto.lng, pinnedPhoto.lat], zoom: ALBUM_PIN_ZOOM }, 900);
+      } else {
+        easeCamera(map, { center: [pinnedPhoto.lng, pinnedPhoto.lat] }, 480);
+      }
       return () => {
         map.off("zoom", onZoom);
         map.off("render", onZoom);
@@ -334,7 +333,7 @@ export function AlbumMiniMap({
     map.on("render", onZoomOut);
     map.on("moveend", onEnd);
     map.on("zoomend", onEnd);
-    flyOverview(map);
+    easeCamera(map, { center: ALBUM_SOUTH_CENTER, zoom: ALBUM_OVERVIEW_ZOOM }, 780);
     return () => {
       map.off("zoom", onZoomOut);
       map.off("render", onZoomOut);
