@@ -2,11 +2,11 @@ import type { Photo } from "@/types/album";
 
 export type AlbumRange = "year" | "month" | "week" | "day";
 
-/** 남한 중심. 줌 5.3에서 한반도가 미니맵 정중앙에 들어오게 고정합니다. */
+/** 남한 중심. 줌 4.3에서 한반도가 미니맵 정중앙에 들어오게 고정합니다. */
 export const ALBUM_SOUTH_CENTER: [number, number] = [127.8, 35.8];
 
 /** 앨범 미니맵 기본 카메라 줌. */
-export const ALBUM_OVERVIEW_ZOOM = 5.3;
+export const ALBUM_OVERVIEW_ZOOM = 4.3;
 
 /** 키컬러 핀을 찍었을 때 상세 모노톤 지도로 들어가는 줌. */
 export const ALBUM_PIN_ZOOM = 12;
