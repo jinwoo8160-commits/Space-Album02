@@ -22,7 +22,7 @@ import {
   LAND_GRID_SOURCE,
   MAPBOX_TOKEN,
 } from "@/lib/map-style";
-import { DOT_MAX_ZOOM } from "@/lib/zoom";
+import { DOT_MAX_ZOOM, mapStageFromZoom, type MapStage } from "@/lib/zoom";
 import type { Photo } from "@/types/album";
 import type { ExpressionSpecification, GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
 import { useCallback, useEffect, useRef } from "react";
@@ -92,15 +92,16 @@ function applyPreviewStage(map: MapboxMap, mode: "dots" | "detail") {
   }
 }
 
-/** lastStage 를 null 로 넘겨 같은 스테이지라도 visibility 를 다시 맞춥니다. */
-function syncMiniStage(map: MapboxMap, mode: "dots" | "detail") {
-  const zoom = mode === "detail" ? ALBUM_PIN_ZOOM : ALBUM_OVERVIEW_ZOOM;
+function liveStage(map: MapboxMap, lastStage: MapStage | null, emptyOverview: boolean): MapStage {
+  const next: MapStage = emptyOverview ? "detail" : mapStageFromZoom(map.getZoom());
+  if (next === lastStage) return next;
   try {
-    applyMapStage(map, zoom, null);
+    applyMapStage(map, emptyOverview ? ALBUM_PIN_ZOOM : map.getZoom(), lastStage);
   } catch {
     /* getLayer can throw while the style graph is swapping */
   }
-  applyPreviewStage(map, mode);
+  applyPreviewStage(map, next);
+  return next;
 }
 
 function ensureMiniDotLayer(map: MapboxMap) {
@@ -179,11 +180,22 @@ export function AlbumMiniMap({
   const gridKeyRef = useRef("");
   const wasPinned = useRef(false);
   const flightGen = useRef(0);
+  const stageRef = useRef<MapStage | null>(null);
   const rebuildTimer = useRef<number | null>(null);
   photosRef.current = photos;
   pinnedRef.current = pinnedPhoto;
 
   const isPinned = Boolean(pinnedPhoto && pinnedPhoto.hasGps !== false);
+
+  const applyStageForZoom = useCallback((map: MapboxMap) => {
+    const emptyOverview =
+      photosRef.current.length === 0 &&
+      !(pinnedRef.current && pinnedRef.current.hasGps !== false);
+    stageRef.current = liveStage(map, stageRef.current, emptyOverview);
+  }, []);
+
+  const applyStageForZoomRef = useRef(applyStageForZoom);
+  applyStageForZoomRef.current = applyStageForZoom;
 
   const rebuildGrid = useCallback((force = false) => {
     const map = mapRef.current?.getMap();
@@ -197,18 +209,17 @@ export function AlbumMiniMap({
       if (!source) return;
 
       const current = photosRef.current;
-      const pinned = Boolean(pinnedRef.current && pinnedRef.current.hasGps !== false);
 
       if (current.length === 0) {
         source.setData(EMPTY_GRID);
         gridKeyRef.current = "empty";
-        if (!pinned) syncMiniStage(map, "detail");
+        applyStageForZoom(map);
         return;
       }
 
       const key = current.map((photo) => `${photo.id}:${photo.category ?? "_"}`).join(",");
       if (!force && gridKeyRef.current === key) {
-        if (!pinned) syncMiniStage(map, "dots");
+        applyStageForZoom(map);
         return;
       }
 
@@ -216,11 +227,11 @@ export function AlbumMiniMap({
         buildLandDotGrid(map, current, "kr", false, {}, { gridCells: ALBUM_MINI_GRID_CELLS }),
       );
       gridKeyRef.current = key;
-      if (!pinned) syncMiniStage(map, "dots");
+      applyStageForZoom(map);
     } catch {
       /* queryRenderedFeatures / getLayer can throw while the style graph is swapping */
     }
-  }, []);
+  }, [applyStageForZoom]);
 
   useEffect(() => {
     if (!ready.current) return;
@@ -256,7 +267,6 @@ export function AlbumMiniMap({
     if (isPinned && pinnedPhoto) {
       const alreadyZoomed = wasPinned.current || map.getZoom() >= DOT_MAX_ZOOM;
       wasPinned.current = true;
-      syncMiniStage(map, "detail");
       try {
         map.stop();
         if (alreadyZoomed) {
@@ -282,13 +292,22 @@ export function AlbumMiniMap({
           bearing: 0,
           pitch: 0,
         });
+        applyStageForZoom(map);
       }
+      const onZoom = () => {
+        if (gen !== flightGen.current) return;
+        applyStageForZoom(map);
+      };
       const onEnd = () => {
         if (gen !== flightGen.current) return;
-        syncMiniStage(map, "detail");
+        applyStageForZoom(map);
       };
+      map.on("zoom", onZoom);
+      map.on("render", onZoom);
       map.once("moveend", onEnd);
       return () => {
+        map.off("zoom", onZoom);
+        map.off("render", onZoom);
         map.off("moveend", onEnd);
       };
     }
@@ -296,30 +315,33 @@ export function AlbumMiniMap({
     if (!wasPinned.current) return;
     wasPinned.current = false;
 
-    const restoreOverview = () => {
+    const onZoomOut = () => {
       if (gen !== flightGen.current) return;
-      if (map.getZoom() >= DOT_MAX_ZOOM) return;
-      resizeMap(map);
-      const empty = photosRef.current.length === 0;
-      syncMiniStage(map, empty ? "detail" : "dots");
-      if (!empty) rebuildGrid(true);
+      applyStageForZoom(map);
     };
-
     const onEnd = () => {
       if (gen !== flightGen.current) return;
       if (map.getZoom() >= DOT_MAX_ZOOM) return;
       map.off("moveend", onEnd);
       map.off("zoomend", onEnd);
-      restoreOverview();
+      map.off("zoom", onZoomOut);
+      map.off("render", onZoomOut);
+      resizeMap(map);
+      applyStageForZoom(map);
+      if (photosRef.current.length > 0) rebuildGrid(true);
     };
+    map.on("zoom", onZoomOut);
+    map.on("render", onZoomOut);
     map.on("moveend", onEnd);
     map.on("zoomend", onEnd);
     flyOverview(map);
     return () => {
+      map.off("zoom", onZoomOut);
+      map.off("render", onZoomOut);
       map.off("moveend", onEnd);
       map.off("zoomend", onEnd);
     };
-  }, [isPinned, pinnedPhoto, rebuildGrid]);
+  }, [applyStageForZoom, isPinned, pinnedPhoto, rebuildGrid]);
 
   if (!MAPBOX_TOKEN) {
     return <div className="h-full w-full bg-white" />;
@@ -365,7 +387,6 @@ export function AlbumMiniMap({
             ensureMiniDotLayer(map);
             ready.current = true;
             const pinned = pinnedRef.current && pinnedRef.current.hasGps !== false;
-            syncMiniStage(map, pinned ? "detail" : photosRef.current.length === 0 ? "detail" : "dots");
             rebuildGrid(true);
             if (pinned && pinnedRef.current) {
               map.jumpTo({
@@ -375,6 +396,11 @@ export function AlbumMiniMap({
                 pitch: 0,
               });
             }
+            applyStageForZoomRef.current(map);
+
+            const onZoomAware = () => applyStageForZoomRef.current(map);
+            map.on("zoom", onZoomAware);
+            map.on("render", onZoomAware);
 
             const paintOverview = () => {
               if (!ready.current) return;
