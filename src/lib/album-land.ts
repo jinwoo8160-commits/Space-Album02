@@ -1,54 +1,8 @@
-import {
-  isInKoreaTerritory,
-  KOREA_GRID_BOUNDS,
-  KOREA_ISLAND_SEEDS,
-} from "@/data/korea-territory";
-import type { FeatureCollection, Point } from "geojson";
-
 /**
- * 앨범 미니맵(200px, 남한 줌 4.15)용 세밀 격자.
- * 위치 도트 `circle-radius` 는 0.1px 로 고정합니다.
+ * 앨범 미니맵(200px) 전용 상수.
+ * 육지 도트 GeoJSON 은 메인 지도와 같은 buildLandDotGrid()가 만듭니다.
  */
 export const ALBUM_MINI_MAP_PX = 200;
-export const ALBUM_LAND_CELLS = 280;
-export const ALBUM_LAND_RADIUS = 0.1;
-
-export function buildKoreaAlbumLandDots(): FeatureCollection<Point> {
-  const bounds = KOREA_GRID_BOUNDS;
-  const latSpan = bounds.maxLat - bounds.minLat;
-  const lngSpan = bounds.maxLng - bounds.minLng;
-  const step = Math.max(latSpan, lngSpan) / ALBUM_LAND_CELLS;
-  const originLat = bounds.minLat + step / 2;
-  const originLng = bounds.minLng + step / 2;
-  const cells: { lng: number; lat: number }[] = [];
-  const seen = new Set<string>();
-
-  const push = (lng: number, lat: number) => {
-    const col = Math.round((lng - originLng) / step);
-    const row = Math.round((lat - originLat) / step);
-    const key = `${row}:${col}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    cells.push({ lng, lat });
-  };
-
-  for (let lat = originLat; lat < bounds.maxLat; lat += step) {
-    for (let lng = originLng; lng < bounds.maxLng; lng += step) {
-      if (!isInKoreaTerritory(lng, lat)) continue;
-      push(lng, lat);
-    }
-  }
-  for (const seed of KOREA_ISLAND_SEEDS) push(seed.lng, seed.lat);
-
-  return {
-    type: "FeatureCollection",
-    features: cells.map((cell, index) => ({
-      type: "Feature",
-      id: index,
-      properties: {},
-      geometry: { type: "Point", coordinates: [cell.lng, cell.lat] },
-    })),
-  };
-}
-
-export const KOREA_ALBUM_LAND_DOTS = buildKoreaAlbumLandDots();
+export const ALBUM_MINI_GRID_CELLS = 60;
+/** 메인 지도 1.85px보다 조금 키워 200px 프레임에서도 점이 읽히게 합니다. */
+export const ALBUM_MINI_DOT_RADIUS = 2.25;

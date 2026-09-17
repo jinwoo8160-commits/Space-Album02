@@ -66,17 +66,26 @@ type DotCell = {
   color: string;
 };
 
+export type LandDotGridOptions = {
+  /** 기본 130. 미니맵은 컨테이너에 맞춰 더 성긴 격자를 씁니다. */
+  gridCells?: number;
+};
+
 export function buildLandDotGrid(
   map: MapboxMap,
   photos: Photo[],
   countryId: CountryId,
   colorize = false,
   hexById: Record<string, string> = {},
+  options: LandDotGridOptions = {},
 ): FeatureCollection<Point, LandDotProps> {
   const bounds = countryId === "kr" ? KOREA_GRID_BOUNDS : COUNTRY_BY_ID[countryId].bounds;
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = bounds.maxLng - bounds.minLng;
-  const step = Math.max(latSpan, lngSpan) / GRID_CELLS;
+  const gridCells = options.gridCells ?? GRID_CELLS;
+  const step = Math.max(latSpan, lngSpan) / gridCells;
+  const kernelCells = KERNEL_RADIUS_CELLS * (gridCells / GRID_CELLS);
+  const kernelSigma = kernelCells / Math.SQRT2;
   const originLat = bounds.minLat + step / 2;
   const originLng = bounds.minLng + step / 2;
   const water = queryWaterPolygons(map);
@@ -118,7 +127,7 @@ export function buildLandDotGrid(
     }
   }
 
-  spreadPhotoKernels(cells, byGrid, photos);
+  spreadPhotoKernels(cells, byGrid, photos, kernelCells, kernelSigma);
   assignDensityLevels(cells);
   assignDotColors(cells, colorize, hexById);
 
@@ -140,7 +149,13 @@ export function buildLandDotGrid(
   };
 }
 
-function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, photos: Photo[]) {
+function spreadPhotoKernels(
+  cells: DotCell[],
+  byGrid: Map<string, DotCell>,
+  photos: Photo[],
+  kernelCells = KERNEL_RADIUS_CELLS,
+  kernelSigma = KERNEL_SIGMA,
+) {
   if (cells.length === 0) return;
 
   for (const photo of photos) {
@@ -159,14 +174,14 @@ function spreadPhotoKernels(cells: DotCell[], byGrid: Map<string, DotCell>, phot
     best.photoCount += 1;
     const categoryKey = photo.category;
 
-    const reach = Math.ceil(KERNEL_RADIUS_CELLS);
+    const reach = Math.ceil(kernelCells);
     for (let dr = -reach; dr <= reach; dr += 1) {
       for (let dc = -reach; dc <= reach; dc += 1) {
         const d = Math.hypot(dr, dc);
-        if (d > KERNEL_RADIUS_CELLS) continue;
+        if (d > kernelCells) continue;
         const neighbor = byGrid.get(`${best.row + dr}:${best.col + dc}`);
         if (!neighbor) continue;
-        const t = d / KERNEL_SIGMA;
+        const t = d / kernelSigma;
         const weight = Math.exp(-(t * t));
         neighbor.totalScore += weight;
         neighbor.scoreByCategory.set(categoryKey, (neighbor.scoreByCategory.get(categoryKey) ?? 0) + weight);
