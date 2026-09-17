@@ -2,6 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { MissingMapboxToken } from "@/components/map/MissingMapboxToken";
 import {
   ALBUM_MINI_DOT_RADIUS,
   ALBUM_MINI_GRID_CELLS,
@@ -343,7 +344,7 @@ export function AlbumMiniMap({
   }, [applyStageForZoom, isPinned, pinnedPhoto, rebuildGrid]);
 
   if (!MAPBOX_TOKEN) {
-    return <div className="h-full w-full bg-white" />;
+    return <MissingMapboxToken compact />;
   }
 
   return (

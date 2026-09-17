@@ -15,6 +15,17 @@ npm run dev
 
 토큰은 [Mapbox 계정](https://account.mapbox.com/access-tokens/)에서 발급하고 `NEXT_PUBLIC_MAPBOX_TOKEN` 으로 등록합니다. 코드는 `process.env.NEXT_PUBLIC_MAPBOX_TOKEN` 만 읽습니다.
 
+## Vercel 배포
+
+1. Vercel 프로젝트 **Environment Variables**에 `NEXT_PUBLIC_MAPBOX_TOKEN`을 추가합니다. `NEXT_PUBLIC_` 접두사가 있어야 클라이언트 번들에 들어갑니다.
+2. 값을 바꾼 뒤에는 **Redeploy**가 필요합니다. 이 변수는 빌드 시점에 주입됩니다.
+3. Mapbox 토큰에 URL 제한이 있으면 `*.vercel.app`과 실제 도메인을 허용 목록에 넣습니다.
+4. `.env.local`은 git에 올라가지 않으므로, 로컬 토큰만 있으면 배포 후 지도가 비어 보입니다.
+
+```bash
+npm run build
+```
+
 ## 줌 (연속)
 
 휠 · 트랙패드 · 핀치 · 왼쪽 +/- 버튼이 Mapbox 연속 줌입니다. 움직이는 동안에는 레이어를 다시 계산하지 않고, **줌 9.5를 넘고 손을 뗐을 때만** `visibility` 를 한 번 바꿉니다.

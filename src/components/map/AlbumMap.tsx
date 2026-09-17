@@ -2,6 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import { MissingMapboxToken } from "@/components/map/MissingMapboxToken";
 import { PhotoClusterMarker } from "@/components/map/PhotoClusterMarker";
 import { PhotoPin } from "@/components/map/PhotoPin";
 import { useMap } from "@/context/map-context";
@@ -25,15 +26,6 @@ import mapboxgl from "mapbox-gl";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
-
-function MissingMapboxToken() {
-  return (
-    <div className="flex h-full w-full items-center justify-center bg-white px-8 text-center text-sm leading-relaxed text-neutral-600">
-      Mapbox 토큰이 없습니다. `.env.local` 에 `NEXT_PUBLIC_MAPBOX_TOKEN` 을 넣고
-      개발 서버를 다시 시작해 주세요.
-    </div>
-  );
-}
 
 function ensureDotLayer(map: mapboxgl.Map, theme: "light" | "dark" = "light") {
   if (!map.getSource(LAND_GRID_SOURCE)) {

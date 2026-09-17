@@ -7,7 +7,7 @@ import {
 } from "@/data/korea-territory";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
 import type { CountryId, GeoBounds } from "@/types/album";
-import type { Feature, FeatureCollection, Point } from "geojson";
+import type { FeatureCollection, Point } from "geojson";
 import type { FilterSpecification, Map as MapboxMap, StyleSpecification } from "mapbox-gl";
 
 /** 국가 선택 모달의 미니 지도. 메인 지도의 사진 밀도 격자와는 별개입니다. */

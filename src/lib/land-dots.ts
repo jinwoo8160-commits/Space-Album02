@@ -8,7 +8,7 @@ import { hexForFilterKey, isBlackKeyColor, UNCLASSIFIED_HEX } from "@/lib/consta
 import { approxDistance } from "@/lib/geo";
 import { MAPBOX_STREETS_SOURCE, WATER_QUERY_LAYER } from "@/lib/map-style";
 import type { CountryId, Photo } from "@/types/album";
-import type { Feature, FeatureCollection, Point } from "geojson";
+import type { FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification, Map as MapboxMap } from "mapbox-gl";
 
 /**

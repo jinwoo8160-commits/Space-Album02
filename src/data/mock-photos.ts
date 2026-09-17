@@ -119,7 +119,7 @@ function unit(seed: number) {
 
 function takenAtForIndex(index: number): string {
   const u = unit(index * 11.17);
-  let ms = RANGE_START + u * (RANGE_END - RANGE_START);
+  const ms = RANGE_START + u * (RANGE_END - RANGE_START);
   if (index % 7 === 0) {
     const day = 1 + Math.floor(unit(index * 4.3) * 13);
     const hour = 8 + Math.floor(unit(index * 9.1) * 12);
