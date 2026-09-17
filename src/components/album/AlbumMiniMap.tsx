@@ -23,7 +23,9 @@ import {
 } from "@/lib/map-style";
 import type { Photo } from "@/types/album";
 import type { ExpressionSpecification, GeoJSONSource, Map as MapboxMap } from "mapbox-gl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { GripHorizontal } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import Map, { Marker, type MapRef } from "react-map-gl/mapbox";
 
 const EMPTY_GRID = { type: "FeatureCollection" as const, features: [] };
@@ -140,10 +142,142 @@ function DebugSlider({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
+        onPointerDown={(event) => event.stopPropagation()}
         className="h-1 min-w-0 flex-1 accent-neutral-900"
       />
       <span className="w-[4.25rem] shrink-0 tabular-nums">{value.toFixed(digits)}</span>
     </label>
+  );
+}
+
+function ViewportDebugPanel({
+  lng,
+  lat,
+  zoom,
+  onLng,
+  onLat,
+  onZoom,
+}: {
+  lng: number;
+  lat: number;
+  zoom: number;
+  onLng: (next: number) => void;
+  onLat: (next: number) => void;
+  onZoom: (next: number) => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    grabX: number;
+    grabY: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const [pos, setPos] = useState({ x: 16, y: 292 });
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const frame = document.getElementById("phone-frame");
+    setHost(frame);
+    if (!frame) return;
+    const mapEl = frame.querySelector("[data-album-mini-map]");
+    if (!mapEl) return;
+    const frameRect = frame.getBoundingClientRect();
+    const mapRect = mapEl.getBoundingClientRect();
+    setPos({
+      x: 16,
+      y: Math.round(mapRect.bottom - frameRect.top + 8),
+    });
+  }, []);
+
+  const clampPos = useCallback(
+    (x: number, y: number, width: number, height: number) => {
+      if (!host) return { x, y };
+      const maxX = Math.max(8, host.clientWidth - width - 8);
+      const maxY = Math.max(8, host.clientHeight - height - 8);
+      return {
+        x: Math.min(maxX, Math.max(8, x)),
+        y: Math.min(maxY, Math.max(8, y)),
+      };
+    },
+    [host],
+  );
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const frame = host?.getBoundingClientRect();
+      if (!frame) return;
+      event.preventDefault();
+      setPos(
+        clampPos(
+          event.clientX - frame.left - drag.grabX,
+          event.clientY - frame.top - drag.grabY,
+          drag.width,
+          drag.height,
+        ),
+      );
+    };
+    const onUp = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      dragRef.current = null;
+      setDragging(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [clampPos, host]);
+
+  const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current;
+    const frame = host?.getBoundingClientRect();
+    if (!panel || !frame) return;
+    const box = panel.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      grabX: event.clientX - box.left,
+      grabY: event.clientY - box.top,
+      width: box.width,
+      height: box.height,
+    };
+    setDragging(true);
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  if (!host) return null;
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      className="pointer-events-auto absolute z-[60] w-[min(320px,calc(100%-32px))] select-none rounded-lg bg-white/95 px-2.5 py-1.5 shadow-md backdrop-blur-sm"
+      style={{ left: pos.x, top: pos.y }}
+    >
+      <div
+        className={`mb-1 flex items-center gap-1.5 ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+        style={{ touchAction: "none" }}
+        onPointerDown={onHandlePointerDown}
+      >
+        <GripHorizontal className="size-3.5 shrink-0 text-neutral-400" />
+        <p className="text-[9px] font-medium tracking-wide text-neutral-400 uppercase">
+          임시 뷰포트 조절 · 드래그해서 이동
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <DebugSlider label="Lng" value={lng} min={LNG_MIN} max={LNG_MAX} step={0.0001} digits={4} onChange={onLng} />
+        <DebugSlider label="Lat" value={lat} min={LAT_MIN} max={LAT_MAX} step={0.0001} digits={4} onChange={onLat} />
+        <DebugSlider label="Zoom" value={zoom} min={ZOOM_MIN} max={ZOOM_MAX} step={0.01} digits={2} onChange={onZoom} />
+      </div>
+    </div>,
+    host,
   );
 }
 
@@ -318,7 +452,7 @@ export function AlbumMiniMap({
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-white">
+    <div className="relative h-full w-full overflow-hidden bg-white" data-album-mini-map>
       <div className="pointer-events-none absolute inset-0">
         <Map
           ref={mapRef}
@@ -391,40 +525,7 @@ export function AlbumMiniMap({
         </Map>
       </div>
 
-      <div className="pointer-events-auto absolute inset-x-10 top-1 z-20 rounded-lg bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-        <p className="mb-1 text-[9px] font-medium tracking-wide text-neutral-400 uppercase">
-          임시 뷰포트 조절
-        </p>
-        <div className="flex flex-col gap-1">
-          <DebugSlider
-            label="Lng"
-            value={lng}
-            min={LNG_MIN}
-            max={LNG_MAX}
-            step={0.0001}
-            digits={4}
-            onChange={setLng}
-          />
-          <DebugSlider
-            label="Lat"
-            value={lat}
-            min={LAT_MIN}
-            max={LAT_MAX}
-            step={0.0001}
-            digits={4}
-            onChange={setLat}
-          />
-          <DebugSlider
-            label="Zoom"
-            value={zoom}
-            min={ZOOM_MIN}
-            max={ZOOM_MAX}
-            step={0.01}
-            digits={2}
-            onChange={setZoom}
-          />
-        </div>
-      </div>
+      <ViewportDebugPanel lng={lng} lat={lat} zoom={zoom} onLng={setLng} onLat={setLat} onZoom={setZoom} />
     </div>
   );
 }
