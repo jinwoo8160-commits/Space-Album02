@@ -7,13 +7,12 @@ import { CountrySelectModal } from "@/components/map/CountrySelectModal";
 import { TimePicker } from "@/components/map/TimePicker";
 import { ZoomControls } from "@/components/map/ZoomControls";
 import { useMap } from "@/context/map-context";
-import { OVERLAY_LABEL } from "@/lib/zoom";
 
 /**
  * 줌은 Mapbox 휠·핀치와 왼쪽 +/- 버튼이 함께 담당합니다.
  */
 export function MapScreen() {
-  const { overlayMode, mapZoom, filteredPhotos, settings } = useMap();
+  const { overlayMode, filteredPhotos, settings } = useMap();
   const dark = settings.mapTheme === "dark";
 
   return (
@@ -31,10 +30,6 @@ export function MapScreen() {
       {/* TODO: [디자인] 첨부 이미지 스타일 반영 위치 — 상단 왼쪽 국가 선택 */}
       <div className="absolute top-4 left-4 z-20">
         <CountrySelectButton />
-      </div>
-
-      <div className="absolute top-5 left-1/2 z-20 -translate-x-1/2 rounded-full border border-neutral-200 bg-white/85 px-2.5 py-1 text-[11px] text-neutral-600 shadow-sm">
-        z {mapZoom.toFixed(1)} · {OVERLAY_LABEL[overlayMode]}
       </div>
 
       {/* TODO: [디자인] 첨부 이미지 스타일 반영 위치 — 상단 오른쪽 컬러핀 */}
