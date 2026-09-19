@@ -12,7 +12,7 @@ import { useMap } from "@/context/map-context";
  * 줌은 Mapbox 휠·핀치와 왼쪽 +/- 버튼이 함께 담당합니다.
  */
 export function MapScreen() {
-  const { overlayMode, filteredPhotos, settings } = useMap();
+  const { filteredPhotos, settings } = useMap();
   const dark = settings.mapTheme === "dark";
 
   return (
@@ -42,15 +42,6 @@ export function MapScreen() {
       <div className="absolute inset-x-0 bottom-[4.35rem] z-20">
         <TimePicker />
       </div>
-
-      <p className="pointer-events-none absolute bottom-[9.15rem] left-0 right-0 text-center text-[11px] text-neutral-500">
-        휠·트랙패드·핀치로 연속 줌 ·{" "}
-        {overlayMode === "dots"
-          ? "점의 진하기 = 사진 밀도 · 줌 9.5에서 흰 지도로"
-          : overlayMode === "clusters"
-            ? "묶음을 누르면 거리 수준으로 들어갑니다"
-            : "사진을 누르면 상세가 열립니다"}
-      </p>
 
       <CountrySelectModal />
     </section>
