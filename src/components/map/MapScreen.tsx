@@ -39,9 +39,7 @@ export function MapScreen() {
 
       {/* TODO: [디자인] 첨부 이미지 스타일 반영 위치 — 상단 오른쪽 컬러핀 */}
       <div className="pointer-events-none absolute top-16 right-3 left-8 z-30 flex flex-col items-end">
-        <div className="pointer-events-auto">
-          <ColorPinFilter />
-        </div>
+        <ColorPinFilter />
       </div>
 
       <ZoomControls />

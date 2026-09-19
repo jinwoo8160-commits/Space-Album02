@@ -58,7 +58,7 @@ export function ColorPinFilter() {
         type="button"
         aria-label="새 카테고리 추가"
         onClick={() => setAddOpen(true)}
-        className="flex size-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-[0_4px_10px_rgba(0,0,0,0.18)]"
+        className="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-neutral-900 text-white shadow-[0_4px_10px_rgba(0,0,0,0.18)]"
       >
         <Plus className="size-4" strokeWidth={3} />
       </button>
@@ -163,7 +163,7 @@ function CategoryPin({
         onPointerUp={clearPress}
         onPointerCancel={clearPress}
         onPointerLeave={clearPress}
-        className="relative size-9 shrink-0 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
+        className="pointer-events-auto relative size-9 shrink-0 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
         style={{
           backgroundColor: color,
           transform: active ? "scale(1.08)" : "scale(1)",
