@@ -11,7 +11,8 @@ const LONG_PRESS_MS = 520;
 /**
  * 오른쪽 키컬러 핀.
  * 탭 = 필터, + = 새 카테고리, 터치 롱프레스 / 마우스 우클릭 = 삭제.
- * 탭 시 핀 왼쪽에 카테고리 이름이 Fade-in 되었다가 약 1.7초 뒤 Fade-out.
+ * 새로 선택(ON)될 때만 핀 왼쪽에 이름이 Fade-in → 약 1.5초 뒤 Fade-out.
+ * 선택 해제(OFF) 시에는 이름을 띄우지 않고, 떠 있던 이름이면 즉시 닫습니다.
  */
 export function ColorPinFilter() {
   const {
@@ -32,6 +33,10 @@ export function ColorPinFilter() {
     setHint({ id, key: hintSeq.current });
   };
 
+  const dismissNameHint = (id: string) => {
+    setHint((current) => (current?.id === id ? null : current));
+  };
+
   return (
     <div className="flex flex-col items-end gap-3 overflow-visible">
       {keyCategories.map((category) => {
@@ -47,8 +52,10 @@ export function ColorPinFilter() {
               setHint((current) => (current?.key === key ? null : current));
             }}
             onToggle={() => {
+              const turningOn = !selectedCategories.has(category.id);
               toggleCategory(category.id);
-              showNameHint(category.id);
+              if (turningOn) showNameHint(category.id);
+              else dismissNameHint(category.id);
             }}
             onDelete={() => setDeleteId(category.id)}
           />
