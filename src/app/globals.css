@@ -151,15 +151,15 @@
   display: none !important;
 }
 
-/* 키컬러 핀: 이름 라벨 Fade-in → 1.7s 유지 → Fade-out (총 2.2s) */
+/* 키컬러 핀: 선택(ON) 시 이름 Fade-in → 1.5s 유지 → Fade-out (총 2s) */
 @keyframes pin-name-hint {
   0% {
     opacity: 0;
   }
-  13% {
+  12.5% {
     opacity: 1;
   }
-  77% {
+  87.5% {
     opacity: 1;
   }
   100% {
@@ -168,5 +168,5 @@
 }
 
 .pin-name-hint {
-  animation: pin-name-hint 2.2s ease-in-out both;
+  animation: pin-name-hint 2s ease-in-out both;
 }
