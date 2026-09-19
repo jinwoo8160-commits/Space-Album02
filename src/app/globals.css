@@ -150,3 +150,23 @@
 .country-mini-map .mapboxgl-ctrl-logo {
   display: none !important;
 }
+
+/* 키컬러 핀: 이름 라벨 Fade-in → 1.7s 유지 → Fade-out (총 2.2s) */
+@keyframes pin-name-hint {
+  0% {
+    opacity: 0;
+  }
+  13% {
+    opacity: 1;
+  }
+  77% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pin-name-hint {
+  animation: pin-name-hint 2.2s ease-in-out both;
+}

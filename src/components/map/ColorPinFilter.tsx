@@ -4,15 +4,14 @@ import { AddCategoryDialog, PhoneFrameModal } from "@/components/map/AddCategory
 import { useMap } from "@/context/map-context";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 const LONG_PRESS_MS = 520;
-const HINT_HOLD_MS = 1700;
-const HINT_FADE_MS = 280;
 
 /**
  * 오른쪽 키컬러 핀.
  * 탭 = 필터, + = 새 카테고리, 터치 롱프레스 / 마우스 우클릭 = 삭제.
+ * 탭 시 핀 왼쪽에 카테고리 이름이 Fade-in 되었다가 약 1.7초 뒤 Fade-out.
  */
 export function ColorPinFilter() {
   const {
@@ -24,36 +23,17 @@ export function ColorPinFilter() {
   } = useMap();
   const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [hintId, setHintId] = useState<string | null>(null);
-  const [hintVisible, setHintVisible] = useState(false);
-  const hideTimer = useRef<number | null>(null);
-  const fadeTimer = useRef<number | null>(null);
+  const [hint, setHint] = useState<{ id: string; key: number } | null>(null);
+  const hintSeq = useRef(0);
   const deleting = keyCategories.find((item) => item.id === deleteId) ?? null;
 
-  const clearHintTimers = () => {
-    if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    if (fadeTimer.current) window.clearTimeout(fadeTimer.current);
-    hideTimer.current = null;
-    fadeTimer.current = null;
-  };
-
   const showNameHint = (id: string) => {
-    clearHintTimers();
-    setHintId(id);
-    setHintVisible(false);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setHintVisible(true));
-    });
-    hideTimer.current = window.setTimeout(() => {
-      setHintVisible(false);
-      fadeTimer.current = window.setTimeout(() => setHintId(null), HINT_FADE_MS);
-    }, HINT_HOLD_MS);
+    hintSeq.current += 1;
+    setHint({ id, key: hintSeq.current });
   };
-
-  useEffect(() => () => clearHintTimers(), []);
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-end gap-3 overflow-visible">
       {keyCategories.map((category) => {
         const active = selectedCategories.has(category.id);
         return (
@@ -62,8 +42,10 @@ export function ColorPinFilter() {
             label={category.name}
             color={category.hex}
             active={active}
-            hintShown={hintId === category.id}
-            hintVisible={hintId === category.id && hintVisible}
+            hintKey={hint?.id === category.id ? hint.key : null}
+            onHintDone={(key) => {
+              setHint((current) => (current?.key === key ? null : current));
+            }}
             onToggle={() => {
               toggleCategory(category.id);
               showNameHint(category.id);
@@ -109,16 +91,16 @@ function CategoryPin({
   label,
   color,
   active,
-  hintShown,
-  hintVisible,
+  hintKey,
+  onHintDone,
   onToggle,
   onDelete,
 }: {
   label: string;
   color: string;
   active: boolean;
-  hintShown: boolean;
-  hintVisible: boolean;
+  hintKey: number | null;
+  onHintDone: (key: number) => void;
   onToggle: () => void;
   onDelete?: () => void;
 }) {
@@ -139,15 +121,16 @@ function CategoryPin({
   };
 
   return (
-    <div className="relative size-9">
-      {hintShown ? (
+    <div className="flex h-9 items-center justify-end gap-2.5">
+      {hintKey != null ? (
         <span
+          key={hintKey}
           className={cn(
-            "pointer-events-none absolute top-1/2 right-full mr-2.5 -translate-y-1/2 whitespace-nowrap text-[12px] font-medium text-neutral-800",
-            "drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] transition-opacity ease-out",
-            hintVisible ? "opacity-100" : "opacity-0",
+            "pin-name-hint pointer-events-none z-10 whitespace-nowrap rounded-full",
+            "bg-white px-2.5 py-1 text-[12px] font-semibold tracking-tight text-neutral-900",
+            "shadow-[0_4px_12px_rgba(0,0,0,0.16)]",
           )}
-          style={{ transitionDuration: `${HINT_FADE_MS}ms` }}
+          onAnimationEnd={() => onHintDone(hintKey)}
         >
           {label}
         </span>
@@ -180,7 +163,7 @@ function CategoryPin({
         onPointerUp={clearPress}
         onPointerCancel={clearPress}
         onPointerLeave={clearPress}
-        className="relative size-9 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
+        className="relative size-9 shrink-0 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
         style={{
           backgroundColor: color,
           transform: active ? "scale(1.08)" : "scale(1)",
