@@ -62,7 +62,7 @@ export function CountrySelectModal() {
       </div>
 
       <h2 className="px-6 pt-4 text-[15px] font-semibold tracking-tight text-neutral-900">
-        지역 배지
+        지역 선택
       </h2>
 
       <div className="grid flex-1 grid-cols-2 content-start gap-x-2 gap-y-6 px-4 pt-4">
