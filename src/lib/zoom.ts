@@ -102,6 +102,12 @@ export function overlayModeFromZoom(zoom: number): OverlayMode {
   return "pins";
 }
 
+export const OVERLAY_LABEL: Record<OverlayMode, string> = {
+  dots: "국가~구 · 도트 지도",
+  clusters: "동/거리 · 모노톤 + 묶음",
+  pins: "동/거리 · 모노톤 + 핀",
+};
+
 export function clusterCellSize(zoom: number) {
   const t = Math.min(1, Math.max(0, (zoom - DOT_MAX_ZOOM) / (CLUSTER_MAX_ZOOM - DOT_MAX_ZOOM)));
   return 0.08 * (1 - t) + 0.016 * t;
