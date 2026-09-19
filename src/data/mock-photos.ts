@@ -1,4 +1,5 @@
-import type { CategoryColor, Photo, PhotoScene, ProvinceId } from "@/types/album";
+import { PLACE_CATEGORY_IDS, migratePhotoCategory } from "@/lib/categories";
+import type { Photo, PhotoScene, ProvinceId } from "@/types/album";
 
 /**
  * 테스트용 사진 500장(한반도 전국) + 해외 3장 + 위치 미지정 3장.
@@ -107,7 +108,7 @@ const SCENE_TITLE: Record<PhotoScene, string> = {
   river: "강",
 };
 
-const KEY_COLORS: Exclude<CategoryColor, null>[] = ["pink", "green", "cyan", "red"];
+const KEY_COLORS = PLACE_CATEGORY_IDS;
 
 const RANGE_START = Date.UTC(2024, 0, 1, 8, 0, 0);
 const RANGE_END = Date.UTC(2026, 8, 13, 20, 0, 0);
@@ -170,7 +171,7 @@ const OVERSEAS: Photo[] = [
     provinceId: "other",
     locationLabel: "東京都 渋谷区",
     districtLabel: "渋谷",
-    category: "pink",
+    category: migratePhotoCategory("pink", "p-os-1"),
     scene: "skyline",
   },
   {
@@ -183,7 +184,7 @@ const OVERSEAS: Photo[] = [
     provinceId: "other",
     locationLabel: "Manhattan, New York",
     districtLabel: "Manhattan",
-    category: "cyan",
+    category: migratePhotoCategory("cyan", "p-os-2"),
     scene: "snow",
   },
   {
@@ -196,7 +197,7 @@ const OVERSEAS: Photo[] = [
     provinceId: "other",
     locationLabel: "北京市 东城区",
     districtLabel: "동청",
-    category: "red",
+    category: migratePhotoCategory("red", "p-os-3"),
     scene: "temple",
   },
 ];
@@ -212,7 +213,7 @@ const UNLOCATED_PHOTOS: Photo[] = [
     provinceId: "other",
     locationLabel: "위치 정보 없음",
     districtLabel: "미지정",
-    category: "green",
+    category: migratePhotoCategory("green", "p-nloc-1"),
     scene: "street",
     hasGps: false,
   },
@@ -226,7 +227,7 @@ const UNLOCATED_PHOTOS: Photo[] = [
     provinceId: "other",
     locationLabel: "위치 정보 없음",
     districtLabel: "미지정",
-    category: "pink",
+    category: migratePhotoCategory("pink", "p-nloc-2"),
     scene: "cafe",
     hasGps: false,
   },
@@ -240,13 +241,16 @@ const UNLOCATED_PHOTOS: Photo[] = [
     provinceId: "other",
     locationLabel: "위치 정보 없음",
     districtLabel: "미지정",
-    category: "red",
+    category: migratePhotoCategory("red", "p-nloc-3"),
     scene: "sunset",
     hasGps: false,
   },
 ];
 
-export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS, ...UNLOCATED_PHOTOS];
+export const MOCK_PHOTOS: Photo[] = [...KOREA_PHOTOS, ...OVERSEAS, ...UNLOCATED_PHOTOS].map((photo) => ({
+  ...photo,
+  category: migratePhotoCategory(photo.category, photo.id),
+}));
 
 export const KOREA_PLACE_OPTIONS = HUBS.map((hub) => ({
   id: hub.name,

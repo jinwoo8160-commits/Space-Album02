@@ -13,7 +13,7 @@
  */
 
 import { COUNTRY_BY_ID } from "@/data/country-masks";
-import { BUILTIN_KEY_CATEGORIES, dropBlackKeyCategories, fallbackBlackPhotoCategory, hexByCategoryList, isBlackKeyColor } from "@/lib/categories";
+import { BUILTIN_KEY_CATEGORIES, dropBlackKeyCategories, fallbackBlackPhotoCategory, hexByCategoryList, isBlackKeyColor, migratePhotoCategory, pickRandomCategoryId } from "@/lib/categories";
 import { latestPhotoYear, MOCK_PHOTOS } from "@/data/mock-photos";
 import { countryBounds } from "@/lib/density-dots";
 import { filterPhotos } from "@/lib/filters";
@@ -119,7 +119,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [photos, setPhotos] = useState<Photo[]>(() =>
     MOCK_PHOTOS.map((photo) => ({
       ...photo,
-      category: fallbackBlackPhotoCategory(photo.category),
+      category: migratePhotoCategory(fallbackBlackPhotoCategory(photo.category), photo.id),
     })),
   );
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>("kr");
@@ -184,6 +184,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeKeyCategory = useCallback((id: string) => {
+    const remainingIds = keyCategories.filter((item) => item.id !== id).map((item) => item.id);
     setKeyCategories((prev) => prev.filter((item) => item.id !== id));
     setSelectedCategories((prev) => {
       const next = new Set(prev);
@@ -191,9 +192,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
       return next;
     });
     setPhotos((prev) =>
-      prev.map((photo) => (photo.category === id ? { ...photo, category: null } : photo)),
+      prev.map((photo) => {
+        if (photo.category !== id) return photo;
+        return { ...photo, category: pickRandomCategoryId(remainingIds, `${photo.id}:${id}`) };
+      }),
     );
-  }, []);
+  }, [keyCategories]);
 
   const setPhotoCategory = useCallback((photoId: string, category: CategoryColor) => {
     const hexById = hexByCategoryList(keyCategories);

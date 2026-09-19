@@ -4,6 +4,7 @@ export {
   CATEGORY_LABEL,
   CATEGORY_PRESET_HEX,
   DEFAULT_DOT_HEX,
+  PLACE_CATEGORY_IDS,
   hexByCategoryList,
   hexForCategory,
   hexForFilterKey,
@@ -12,6 +13,10 @@ export {
   dropBlackKeyCategories,
   fallbackBlackPhotoCategory,
   isBlackKeyColor,
+  isPlaceCategoryId,
+  migratePhotoCategory,
+  migratePhotosToPlaceCategories,
+  pickRandomPlaceCategory,
 } from "@/lib/categories";
 
 /** 동 수준에서 "같은 좌표"로 볼 반올림 자릿수. */

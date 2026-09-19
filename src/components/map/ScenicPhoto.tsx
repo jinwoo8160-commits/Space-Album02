@@ -232,7 +232,7 @@ function SkylineScene() {
       <rect x="28" y="18" width="12" height="82" fill="#22223b" />
       <rect x="46" y="28" width="18" height="72" fill="#4a4e69" />
       <rect x="70" y="10" width="16" height="90" fill="#1b1b2f" />
-      <circle cx="80" cy="18" r="6" fill={CATEGORY_HEX.pink} />
+      <circle cx="80" cy="18" r="6" fill={CATEGORY_HEX.restaurant ?? "#E13E2B"} />
     </>
   );
 }
