@@ -2,10 +2,13 @@
 
 import { AddCategoryDialog, PhoneFrameModal } from "@/components/map/AddCategoryDialog";
 import { useMap } from "@/context/map-context";
+import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LONG_PRESS_MS = 520;
+const HINT_HOLD_MS = 1700;
+const HINT_FADE_MS = 280;
 
 /**
  * 오른쪽 키컬러 핀.
@@ -21,7 +24,33 @@ export function ColorPinFilter() {
   } = useMap();
   const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [hintId, setHintId] = useState<string | null>(null);
+  const [hintVisible, setHintVisible] = useState(false);
+  const hideTimer = useRef<number | null>(null);
+  const fadeTimer = useRef<number | null>(null);
   const deleting = keyCategories.find((item) => item.id === deleteId) ?? null;
+
+  const clearHintTimers = () => {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    if (fadeTimer.current) window.clearTimeout(fadeTimer.current);
+    hideTimer.current = null;
+    fadeTimer.current = null;
+  };
+
+  const showNameHint = (id: string) => {
+    clearHintTimers();
+    setHintId(id);
+    setHintVisible(false);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setHintVisible(true));
+    });
+    hideTimer.current = window.setTimeout(() => {
+      setHintVisible(false);
+      fadeTimer.current = window.setTimeout(() => setHintId(null), HINT_FADE_MS);
+    }, HINT_HOLD_MS);
+  };
+
+  useEffect(() => () => clearHintTimers(), []);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -33,7 +62,12 @@ export function ColorPinFilter() {
             label={category.name}
             color={category.hex}
             active={active}
-            onToggle={() => toggleCategory(category.id)}
+            hintShown={hintId === category.id}
+            hintVisible={hintId === category.id && hintVisible}
+            onToggle={() => {
+              toggleCategory(category.id);
+              showNameHint(category.id);
+            }}
             onDelete={() => setDeleteId(category.id)}
           />
         );
@@ -75,12 +109,16 @@ function CategoryPin({
   label,
   color,
   active,
+  hintShown,
+  hintVisible,
   onToggle,
   onDelete,
 }: {
   label: string;
   color: string;
   active: boolean;
+  hintShown: boolean;
+  hintVisible: boolean;
   onToggle: () => void;
   onDelete?: () => void;
 }) {
@@ -101,42 +139,56 @@ function CategoryPin({
   };
 
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      aria-label={`${label} 필터`}
-      onClick={() => {
-        if (openedDelete.current) {
-          openedDelete.current = false;
-          return;
-        }
-        onToggle();
-      }}
-      onContextMenu={(event) => {
-        if (!onDelete) return;
-        event.preventDefault();
-        openDelete();
-      }}
-      onPointerDown={(event) => {
-        if (!onDelete) return;
-        if (event.pointerType === "mouse") return;
-        clearPress();
-        pressTimer.current = window.setTimeout(() => {
-          pressTimer.current = null;
+    <div className="relative size-9">
+      {hintShown ? (
+        <span
+          className={cn(
+            "pointer-events-none absolute top-1/2 right-full mr-2.5 -translate-y-1/2 whitespace-nowrap text-[12px] font-medium text-neutral-800",
+            "drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] transition-opacity ease-out",
+            hintVisible ? "opacity-100" : "opacity-0",
+          )}
+          style={{ transitionDuration: `${HINT_FADE_MS}ms` }}
+        >
+          {label}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        aria-pressed={active}
+        aria-label={`${label} 필터`}
+        onClick={() => {
+          if (openedDelete.current) {
+            openedDelete.current = false;
+            return;
+          }
+          onToggle();
+        }}
+        onContextMenu={(event) => {
+          if (!onDelete) return;
+          event.preventDefault();
           openDelete();
-        }, LONG_PRESS_MS);
-      }}
-      onPointerUp={clearPress}
-      onPointerCancel={clearPress}
-      onPointerLeave={clearPress}
-      className="relative size-9 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
-      style={{
-        backgroundColor: color,
-        transform: active ? "scale(1.08)" : "scale(1)",
-        boxShadow: active ? `0 0 0 3px white, 0 0 0 5px ${color}` : undefined,
-        WebkitTouchCallout: "none",
-      }}
-    />
+        }}
+        onPointerDown={(event) => {
+          if (!onDelete) return;
+          if (event.pointerType === "mouse") return;
+          clearPress();
+          pressTimer.current = window.setTimeout(() => {
+            pressTimer.current = null;
+            openDelete();
+          }, LONG_PRESS_MS);
+        }}
+        onPointerUp={clearPress}
+        onPointerCancel={clearPress}
+        onPointerLeave={clearPress}
+        className="relative size-9 touch-manipulation rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.18)] select-none transition-transform"
+        style={{
+          backgroundColor: color,
+          transform: active ? "scale(1.08)" : "scale(1)",
+          boxShadow: active ? `0 0 0 3px white, 0 0 0 5px ${color}` : undefined,
+          WebkitTouchCallout: "none",
+        }}
+      />
+    </div>
   );
 }
 
