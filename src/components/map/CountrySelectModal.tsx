@@ -1,11 +1,10 @@
 "use client";
 
 import { COUNTRIES } from "@/data/country-masks";
-import { MOCK_PHOTOS } from "@/data/mock-photos";
 import { useMap } from "@/context/map-context";
 import { unlockCountryMessage } from "@/lib/korean";
 import type { CountryId } from "@/types/album";
-import { Lock, Share } from "lucide-react";
+import { Lock } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -60,22 +59,6 @@ export function CountrySelectModal() {
         <div className="pointer-events-none relative h-36 w-full overflow-hidden rounded-2xl border border-neutral-200 bg-white">
           <CountryMiniMap id="world" className="h-full w-full" />
         </div>
-        <button
-          type="button"
-          aria-label="공유"
-          className="absolute right-6 bottom-1 z-10 flex size-8 items-center justify-center text-neutral-700"
-          onClick={async (event) => {
-            event.stopPropagation();
-            const text = `시공간 앨범 · ${COUNTRIES.length}개국 · ${MOCK_PHOTOS.length}장의 사진`;
-            try {
-              await navigator.clipboard.writeText(text);
-            } catch {
-              /* 클립보드 권한이 없어도 모달은 그대로 둡니다. */
-            }
-          }}
-        >
-          <Share className="size-5" />
-        </button>
       </div>
 
       <h2 className="px-6 pt-4 text-[15px] font-semibold tracking-tight text-neutral-900">
