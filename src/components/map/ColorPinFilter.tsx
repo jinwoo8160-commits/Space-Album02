@@ -12,7 +12,7 @@ const LONG_PRESS_MS = 520;
  * 오른쪽 키컬러 핀.
  * 탭 = 필터, + = 새 카테고리, 터치 롱프레스 / 마우스 우클릭 = 삭제.
  * 새로 선택(ON)될 때만 핀 왼쪽에 이름이 Fade-in → 약 1.5초 뒤 Fade-out.
- * 선택 해제(OFF) 시에는 이름을 띄우지 않고, 떠 있던 이름이면 즉시 닫습니다.
+ * 각 카테고리 타이머는 독립이고, 선택 해제(OFF) 시 해당 이름만 즉시 닫습니다.
  */
 export function ColorPinFilter() {
   const {
@@ -24,32 +24,43 @@ export function ColorPinFilter() {
   } = useMap();
   const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [hint, setHint] = useState<{ id: string; key: number } | null>(null);
+  const [hints, setHints] = useState<Record<string, number>>({});
   const hintSeq = useRef(0);
   const deleting = keyCategories.find((item) => item.id === deleteId) ?? null;
 
   const showNameHint = (id: string) => {
     hintSeq.current += 1;
-    setHint({ id, key: hintSeq.current });
+    setHints((current) => ({ ...current, [id]: hintSeq.current }));
   };
 
   const dismissNameHint = (id: string) => {
-    setHint((current) => (current?.id === id ? null : current));
+    setHints((current) => {
+      if (current[id] == null) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
   };
 
   return (
     <div className="flex flex-col items-end gap-3 overflow-visible">
       {keyCategories.map((category) => {
         const active = selectedCategories.has(category.id);
+        const hintKey = hints[category.id] ?? null;
         return (
           <CategoryPin
             key={category.id}
             label={category.name}
             color={category.hex}
             active={active}
-            hintKey={hint?.id === category.id ? hint.key : null}
+            hintKey={hintKey}
             onHintDone={(key) => {
-              setHint((current) => (current?.key === key ? null : current));
+              setHints((current) => {
+                if (current[category.id] !== key) return current;
+                const next = { ...current };
+                delete next[category.id];
+                return next;
+              });
             }}
             onToggle={() => {
               const turningOn = !selectedCategories.has(category.id);
