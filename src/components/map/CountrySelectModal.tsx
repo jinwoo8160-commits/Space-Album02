@@ -40,8 +40,7 @@ export function CountrySelectModal() {
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-[#f7f7f7]">
-      <div className="flex items-center justify-between px-5 pt-5">
-        <p className="text-sm font-medium text-neutral-500">나라를 고르면 지도가 바뀝니다</p>
+      <div className="flex items-center justify-end px-5 pt-5">
         <button
           type="button"
           className="text-sm text-neutral-500"
